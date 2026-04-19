@@ -1,12 +1,12 @@
 import { beforeAll } from 'vitest';
-import { ComponentNameElement } from '../COMPONENT-NAME.js';
+import { FormSaverElement } from '../form-saver.js';
 
 // Define the custom element before tests run
 beforeAll(() => {
-	if (!customElements.get('COMPONENT-NAME')) {
-		customElements.define('COMPONENT-NAME', ComponentNameElement);
+	if (!customElements.get('form-saver')) {
+		customElements.define('form-saver', FormSaverElement);
 	}
 
 	// Make the class available globally for testing static methods
-	globalThis.ComponentNameElement = ComponentNameElement;
+	globalThis.FormSaverElement = FormSaverElement;
 });

@@ -1,1 +1,1 @@
-export { ComponentNameElement } from './COMPONENT-NAME.js';
+export { FormSaverElement } from './form-saver.js';

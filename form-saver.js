@@ -1,17 +1,17 @@
 /**
- * ComponentNameElement - COMPONENT_DESCRIPTION
+ * FormSaverElement - A web component that stores (and restores) values within the form it wraps
  *
- * @element COMPONENT-NAME
+ * @element form-saver
  *
  * @attr {string} example-attribute - Description of the attribute
  *
- * @fires COMPONENT-NAME:event-name - Description of the event
+ * @fires form-saver:event-name - Description of the event
  *
  * @slot - Default slot for content
  *
  * @cssprop --component-name-color - Description of CSS custom property
  */
-export class ComponentNameElement extends HTMLElement {
+export class FormSaverElement extends HTMLElement {
 	static get observedAttributes() {
 		return ['example-attribute'];
 	}
@@ -59,7 +59,7 @@ export class ComponentNameElement extends HTMLElement {
 				// Only dispatch if the change came from internal component activity
 				if (this._internals.isRendered) {
 					// Example pattern (commented out by default):
-					// this.dispatchEvent(new CustomEvent('COMPONENT-NAME:change', {
+					// this.dispatchEvent(new CustomEvent('form-saver:change', {
 					//   detail: { exampleAttribute: newValue },
 					//   bubbles: true,
 					//   composed: true
