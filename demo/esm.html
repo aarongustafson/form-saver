@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>COMPONENT-NAME via esm.sh</title>
+		<link rel="stylesheet" href="./styles.css" />
+		<style>
+			/* Demo-specific styles */
+		</style>
+	</head>
+	<body>
+		<h1>esm.sh CDN sanity check</h1>
+		<p>
+			This page loads the component class from <code>esm.sh</code> and
+			registers it manually.
+		</p>
+
+		<COMPONENT-NAME>
+			<p>Replace this markup once you customize COMPONENT-NAME.</p>
+		</COMPONENT-NAME>
+
+		<script type="module">
+			import { ComponentNameElement } from 'https://esm.sh/@aarongustafson/COMPONENT-NAME@0.0.1/COMPONENT-NAME.js?bundle&target=es2022';
+
+			if (!customElements.get('COMPONENT-NAME')) {
+				customElements.define('COMPONENT-NAME', ComponentNameElement);
+			}
+		</script>
+	</body>
+</html>

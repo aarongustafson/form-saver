@@ -1,0 +1,17 @@
+node_modules/
+package-lock.json
+test/
+demo/
+scripts/
+.prettierrc
+.editorconfig
+.gitattributes
+eslint.config.js
+vitest.config.js
+.git
+.gitignore
+.github/
+SETUP.md
+TEMPLATE_README.md
+CONTRIBUTING.md
+coverage/

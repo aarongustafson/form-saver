@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>COMPONENT-NAME via unpkg</title>
+		<link rel="stylesheet" href="./styles.css" />
+		<style>
+			/* Demo-specific styles */
+		</style>
+	</head>
+	<body>
+		<h1>unpkg CDN sanity check</h1>
+		<p>
+			This page loads the guarded definition helper from
+			<code>unpkg</code> and registers the element when supported.
+		</p>
+
+		<COMPONENT-NAME>
+			<p>Replace this markup once you customize COMPONENT-NAME.</p>
+		</COMPONENT-NAME>
+
+		<script type="module">
+			import { defineComponentName } from 'https://unpkg.com/@aarongustafson/COMPONENT-NAME@latest/define.js?module';
+
+			defineComponentName();
+		</script>
+	</body>
+</html>

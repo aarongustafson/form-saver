@@ -1,0 +1,80 @@
+{
+	"name": "@aarongustafson/COMPONENT-NAME",
+	"version": "0.0.1",
+	"description": "COMPONENT_DESCRIPTION",
+	"keywords": [
+		"html",
+		"custom element",
+		"web component"
+	],
+	"author": "Aaron Gustafson <aaron@easy-designs.net> (https://www.aaron-gustafson.com/)",
+	"license": "MIT",
+	"homepage": "https://github.com/aarongustafson/COMPONENT-NAME#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aarongustafson/COMPONENT-NAME.git"
+	},
+	"bugs": {
+		"url": "https://github.com/aarongustafson/COMPONENT-NAME/issues"
+	},
+	"type": "module",
+	"main": "index.js",
+	"module": "COMPONENT-NAME.js",
+	"customElements": "custom-elements.json",
+	"types": "COMPONENT-NAME.d.ts",
+	"exports": {
+		".": {
+			"import": "./index.js"
+		},
+		"./COMPONENT-NAME.js": {
+			"types": "./COMPONENT-NAME.d.ts",
+			"import": "./COMPONENT-NAME.js"
+		},
+		"./define.js": {
+			"import": "./define.js"
+		},
+		"./custom-elements.json": "./custom-elements.json"
+	},
+	"files": [
+		"COMPONENT-NAME.js",
+		"COMPONENT-NAME.d.ts",
+		"define.js",
+		"index.js",
+		"custom-elements.json",
+		"README.md",
+		"LICENSE"
+	],
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"scripts": {
+		"setup": "node scripts/setup.js",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"lint": "npm run lint:eslint && npm run lint:prettier",
+		"format": "npm run format:eslint && npm run format:prettier",
+		"lint:eslint": "eslint .",
+		"format:eslint": "eslint . --fix",
+		"lint:prettier": "prettier \"**/*.js\" --check --ignore-path .gitignore",
+		"format:prettier": "prettier \"**/*.js\" --write --ignore-path .gitignore",
+		"version": "node scripts/update-demo-versions.js && git add demo/esm.html",
+		"postversion": "git push --follow-tags"
+	},
+	"devDependencies": {
+		"@open-wc/eslint-config": "^13.0.0",
+		"@testing-library/dom": "^10.4.1",
+		"@testing-library/user-event": "^14.6.1",
+		"@vitest/coverage-v8": "^4.0.10",
+		"@vitest/ui": "^4.0.10",
+		"eslint": "^9.39.1",
+		"eslint-config-prettier": "^10.1.8",
+		"happy-dom": "^20.0.10",
+		"prettier": "^3.6.2",
+		"vitest": "^4.0.10"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

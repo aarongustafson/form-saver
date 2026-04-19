@@ -1,0 +1,35 @@
+{
+	"schemaVersion": "1.0.0",
+	"readme": "",
+	"modules": [
+		{
+			"kind": "javascript-module",
+			"path": "COMPONENT-NAME.js",
+			"declarations": [
+				{
+					"kind": "class",
+					"description": "COMPONENT_DESCRIPTION",
+					"name": "ComponentNameElement",
+					"members": [],
+					"events": [],
+					"attributes": [],
+					"superclass": {
+						"name": "HTMLElement"
+					},
+					"tagName": "COMPONENT-NAME",
+					"customElement": true
+				}
+			],
+			"exports": [
+				{
+					"kind": "js",
+					"name": "ComponentNameElement",
+					"declaration": {
+						"name": "ComponentNameElement",
+						"module": "COMPONENT-NAME.js"
+					}
+				}
+			]
+		}
+	]
+}
