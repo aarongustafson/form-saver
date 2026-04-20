@@ -14,60 +14,98 @@
 						{
 							"kind": "field",
 							"name": "retain",
-							"privacy": "public"
+							"type": { "text": "string | null" },
+							"description": "Space-separated list of field names (or ids as fallback) to retain after a successful form submission.",
+							"privacy": "public",
+							"attribute": "retain"
 						},
 						{
 							"kind": "field",
 							"name": "retainChoice",
-							"privacy": "public"
+							"type": { "text": "boolean" },
+							"description": "When present, injects an accessible opt-in retention checkbox into the form.",
+							"privacy": "public",
+							"attribute": "retain-choice"
 						},
 						{
 							"kind": "field",
 							"name": "retainChoiceLabel",
-							"privacy": "public"
+							"type": { "text": "string | null" },
+							"description": "Plain-text label for the injected retention checkbox.",
+							"privacy": "public",
+							"attribute": "retain-choice-label"
 						},
 						{
 							"kind": "field",
 							"name": "retainChoiceContainer",
-							"privacy": "public"
+							"type": { "text": "string | null" },
+							"description": "CSS selector for a container element into which the retention checkbox is appended.",
+							"privacy": "public",
+							"attribute": "retain-choice-container"
 						},
 						{
 							"kind": "field",
 							"name": "storageKey",
-							"privacy": "public"
+							"type": { "text": "string | null" },
+							"description": "Optional explicit localStorage key override. When omitted the key is derived from the form's method and resolved action URL.",
+							"privacy": "public",
+							"attribute": "storage-key"
 						},
 						{
 							"kind": "method",
 							"name": "saveFormState",
+							"description": "Serializes and persists the current form field values to localStorage.",
 							"privacy": "public"
 						},
 						{
 							"kind": "method",
 							"name": "restoreFormState",
+							"description": "Applies previously saved field values to the current form.",
 							"privacy": "public"
 						},
 						{
 							"kind": "method",
 							"name": "clearSavedData",
+							"description": "Removes the saved data for this form from localStorage.",
 							"privacy": "public"
 						}
 					],
 					"events": [],
 					"attributes": [
 						{
-							"name": "retain"
+							"name": "retain",
+							"type": { "text": "string" },
+							"default": "\"\"",
+							"description": "Space-separated list of field names (or ids as fallback) to retain after a successful form submission.",
+							"fieldName": "retain"
 						},
 						{
-							"name": "retain-my-info"
+							"name": "retain-choice",
+							"type": { "text": "boolean" },
+							"default": "false",
+							"description": "When present, injects an accessible opt-in retention checkbox into the form.",
+							"fieldName": "retainChoice"
 						},
 						{
-							"name": "retain-my-info-label"
+							"name": "retain-choice-label",
+							"type": { "text": "string" },
+							"default": "\"Store my contact information for later\"",
+							"description": "Plain-text label for the injected retention checkbox.",
+							"fieldName": "retainChoiceLabel"
 						},
 						{
-							"name": "retain-my-info-selector"
+							"name": "retain-choice-container",
+							"type": { "text": "string" },
+							"default": "\"\"",
+							"description": "CSS selector for a container element into which the retention checkbox is appended. When omitted the checkbox is inserted before the first submit control.",
+							"fieldName": "retainChoiceContainer"
 						},
 						{
-							"name": "storage-key"
+							"name": "storage-key",
+							"type": { "text": "string" },
+							"default": "\"form-saver:{method}:{resolvedActionUrl}\"",
+							"description": "Optional explicit localStorage key override.",
+							"fieldName": "storageKey"
 						}
 					],
 					"superclass": {
