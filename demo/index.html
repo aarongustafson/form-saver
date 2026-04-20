@@ -86,54 +86,282 @@
 				</div>
 			</section>
 
-			<!-- Example with Attributes -->
+			<!-- Retain Specific Fields -->
 			<section>
-				<h2>Example with Attributes</h2>
+				<h2>Retaining specific fields</h2>
 				<p>
-					Retain selected fields after submit and allow users to opt
-					in.
+					The <code>retain</code> attribute takes a
+					space-separated list of field names (or IDs as a fallback)
+					that should survive a <em>successful</em> form submission —
+					everything else is wiped. This is useful for contact forms
+					where you want to pre-populate the sender's name and email
+					address on their next visit, but not their message.
 				</p>
 
 				<div class="demo-section">
-					<h3>Using Attributes</h3>
+					<h3>Using the <code>retain</code> attribute</h3>
 					<p>
-						This injects an accessible checkbox before the submit
-						button. Only the retained fields persist after a
-						successful submit flow.
+						After you submit this form, reload the page. The
+						<strong>Name</strong> and <strong>Email</strong> fields
+						will be restored; <strong>Message</strong> will be
+						blank.
+					</p>
+					<div class="code-demo-pair">
+						<pre><code>&lt;form-saver retain="name email"&gt;
+  &lt;form action="/contact" method="post"&gt;
+    &lt;label&gt;
+      Name
+      &lt;input name="name" autocomplete="name" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Email
+      &lt;input name="email" type="email" autocomplete="email" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Message
+      &lt;textarea name="message"&gt;&lt;/textarea&gt;
+    &lt;/label&gt;
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/form-saver&gt;</code></pre>
+						<div class="demo">
+							<form-saver
+								retain="name email"
+								storage-key="demo:retain-fields"
+							>
+								<form action="/contact" method="post">
+									<label>
+										Name
+										<input
+											name="name"
+											autocomplete="name"
+										/>
+									</label>
+									<label>
+										Email
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+										/>
+									</label>
+									<label>
+										Message
+										<textarea name="message"></textarea>
+									</label>
+									<button type="submit">Send</button>
+								</form>
+							</form-saver>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- User-controlled retention -->
+			<section>
+				<h2>Letting users control long-term retention</h2>
+				<p>
+					Sometimes you should let the <em>user</em> decide whether
+					their details are kept. The <code>retain-choice</code>
+					attribute injects an accessible opt-in checkbox into the
+					form. If the user leaves it unchecked (the default), the
+					retained fields are cleared on submit just like everything
+					else. You can further customise the experience with
+					<code>retain-choice-label</code> and
+					<code>retain-choice-container</code>.
+				</p>
+
+				<div class="demo-section">
+					<h3>
+						Simple opt-in: <code>retain-choice</code>
+					</h3>
+					<p>
+						Add <code>retain-choice</code> alongside
+						<code>retain</code> and <code>&lt;form-saver&gt;</code>
+						will automatically inject a labelled checkbox directly
+						before the submit button. The default label is
+						<em>"Store my contact information for later"</em>.
 					</p>
 					<div class="code-demo-pair">
 						<pre><code>&lt;form-saver
   retain="name email"
   retain-choice
-  retain-choice-label="Store my contact information for later"
 &gt;
   &lt;form action="/contact" method="post"&gt;
-    &lt;input name="name" /&gt;
-    &lt;input name="email" type="email" /&gt;
-    &lt;textarea name="message"&gt;&lt;/textarea&gt;
-    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+    &lt;label&gt;
+      Name
+      &lt;input name="name" autocomplete="name" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Email
+      &lt;input name="email" type="email" autocomplete="email" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Message
+      &lt;textarea name="message"&gt;&lt;/textarea&gt;
+    &lt;/label&gt;
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 &lt;/form-saver&gt;</code></pre>
 						<div class="demo">
 							<form-saver
 								retain="name email"
 								retain-choice
-								retain-choice-label="Store my contact information for later"
+								storage-key="demo:retain-choice-basic"
 							>
 								<form action="/contact" method="post">
 									<label>
 										Name
-										<input name="name" />
+										<input
+											name="name"
+											autocomplete="name"
+										/>
 									</label>
 									<label>
 										Email
-										<input name="email" type="email" />
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+										/>
 									</label>
 									<label>
 										Message
 										<textarea name="message"></textarea>
 									</label>
-									<button type="submit">Submit</button>
+									<button type="submit">Send</button>
+								</form>
+							</form-saver>
+						</div>
+					</div>
+				</div>
+
+				<div class="demo-section">
+					<h3>
+						Custom label:
+						<code>retain-choice-label</code>
+					</h3>
+					<p>
+						Use <code>retain-choice-label</code> to provide label
+						text that better fits your form's context or brand
+						voice.
+					</p>
+					<div class="code-demo-pair">
+						<pre><code>&lt;form-saver
+  retain="name email"
+  retain-choice
+  retain-choice-label="Remember my details next time"
+&gt;
+  &lt;form action="/contact" method="post"&gt;
+    ...
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/form-saver&gt;</code></pre>
+						<div class="demo">
+							<form-saver
+								retain="name email"
+								retain-choice
+								retain-choice-label="Remember my details next time"
+								storage-key="demo:retain-choice-label"
+							>
+								<form action="/contact" method="post">
+									<label>
+										Name
+										<input
+											name="name"
+											autocomplete="name"
+										/>
+									</label>
+									<label>
+										Email
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+										/>
+									</label>
+									<label>
+										Message
+										<textarea name="message"></textarea>
+									</label>
+									<button type="submit">Send</button>
+								</form>
+							</form-saver>
+						</div>
+					</div>
+				</div>
+
+				<div class="demo-section">
+					<h3>
+						Custom placement:
+						<code>retain-choice-container</code>
+					</h3>
+					<p>
+						By default the checkbox is inserted immediately before
+						the submit button. If your form layout requires it
+						elsewhere — say, inside a dedicated actions bar or a
+						privacy notice area — point
+						<code>retain-choice-container</code> at a CSS selector
+						that matches the container element you want. The
+						checkbox wrapper will be <em>appended inside</em> that
+						element.
+					</p>
+					<div class="code-demo-pair">
+						<pre><code>&lt;form-saver
+  retain="name email"
+  retain-choice
+  retain-choice-label="Remember my details next time"
+  retain-choice-container=".form-footer"
+&gt;
+  &lt;form action="/contact" method="post"&gt;
+    &lt;label&gt;
+      Name
+      &lt;input name="name" autocomplete="name" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Email
+      &lt;input name="email" type="email" autocomplete="email" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Message
+      &lt;textarea name="message"&gt;&lt;/textarea&gt;
+    &lt;/label&gt;
+    &lt;div class="form-footer"&gt;
+      &lt;button type="submit"&gt;Send&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/form&gt;
+&lt;/form-saver&gt;</code></pre>
+						<div class="demo">
+							<form-saver
+								retain="name email"
+								retain-choice
+								retain-choice-label="Remember my details next time"
+								retain-choice-container=".form-footer"
+								storage-key="demo:retain-choice-container"
+							>
+								<form action="/contact" method="post">
+									<label>
+										Name
+										<input
+											name="name"
+											autocomplete="name"
+										/>
+									</label>
+									<label>
+										Email
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+										/>
+									</label>
+									<label>
+										Message
+										<textarea name="message"></textarea>
+									</label>
+									<div class="form-footer">
+										<button type="submit">Send</button>
+									</div>
 								</form>
 							</form-saver>
 						</div>
