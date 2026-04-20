@@ -560,10 +560,14 @@ export class FormSaverElement extends HTMLElement {
 
 		const $label = document.createElement('label');
 		$label.setAttribute('for', control_id);
-		$label.textContent =
-			this.retainChoiceLabel || 'Store my contact information for later';
+		$label.append(
+			$checkbox,
+			document.createTextNode(
+				` ${this.retainChoiceLabel || 'Store my contact information for later'}`,
+			),
+		);
 
-		$wrapper.append($checkbox, document.createTextNode(' '), $label);
+		$wrapper.append($label);
 		this._insertRetentionControl($form, $wrapper);
 		this._internals.retainCheckbox = $checkbox;
 	}

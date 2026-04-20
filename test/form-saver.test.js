@@ -259,7 +259,7 @@ describe('FormSaverElement', () => {
 			expect(checkbox.checked).toBe(false);
 			expect(label.getAttribute('for')).toBe(checkbox.id);
 			expect(label.textContent).toBe(
-				'Store my contact information for later',
+				' Store my contact information for later',
 			);
 			expect(control.nextElementSibling?.getAttribute('type')).toBe(
 				'submit',
@@ -286,7 +286,7 @@ describe('FormSaverElement', () => {
 			);
 			const label = control.querySelector('label');
 
-			expect(label.textContent).toBe('Remember my details');
+			expect(label.textContent).toBe(' Remember my details');
 			expect($container.contains(control)).toBe(true);
 		});
 
