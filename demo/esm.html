@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>COMPONENT-NAME via esm.sh</title>
+		<title>form-saver via esm.sh</title>
 		<link rel="stylesheet" href="./styles.css" />
 		<style>
 			/* Demo-specific styles */
@@ -16,15 +16,25 @@
 			registers it manually.
 		</p>
 
-		<COMPONENT-NAME>
-			<p>Replace this markup once you customize COMPONENT-NAME.</p>
-		</COMPONENT-NAME>
+		<form-saver>
+			<form action="/demo-contact" method="post">
+				<label>
+					Name
+					<input name="name" />
+				</label>
+				<label>
+					Email
+					<input name="email" type="email" />
+				</label>
+				<button type="submit">Send</button>
+			</form>
+		</form-saver>
 
 		<script type="module">
-			import { ComponentNameElement } from 'https://esm.sh/@aarongustafson/COMPONENT-NAME@0.0.1/COMPONENT-NAME.js?bundle&target=es2022';
+			import { FormSaverElement } from 'https://esm.sh/@aarongustafson/form-saver@0.0.1/form-saver.js?bundle&target=es2022';
 
-			if (!customElements.get('COMPONENT-NAME')) {
-				customElements.define('COMPONENT-NAME', ComponentNameElement);
+			if (!customElements.get('form-saver')) {
+				customElements.define('form-saver', FormSaverElement);
 			}
 		</script>
 	</body>

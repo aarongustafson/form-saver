@@ -8,11 +8,68 @@
 			"declarations": [
 				{
 					"kind": "class",
-					"description": "A web component that stores (and restores) values within the form it wraps",
+					"description": "A web component that stores (and restores) values within the first form it contains.",
 					"name": "FormSaverElement",
-					"members": [],
+					"members": [
+						{
+							"kind": "field",
+							"name": "retain",
+							"privacy": "public"
+						},
+						{
+							"kind": "field",
+							"name": "retainChoice",
+							"privacy": "public"
+						},
+						{
+							"kind": "field",
+							"name": "retainChoiceLabel",
+							"privacy": "public"
+						},
+						{
+							"kind": "field",
+							"name": "retainChoiceContainer",
+							"privacy": "public"
+						},
+						{
+							"kind": "field",
+							"name": "storageKey",
+							"privacy": "public"
+						},
+						{
+							"kind": "method",
+							"name": "saveFormState",
+							"privacy": "public"
+						},
+						{
+							"kind": "method",
+							"name": "restoreFormState",
+							"privacy": "public"
+						},
+						{
+							"kind": "method",
+							"name": "clearSavedData",
+							"privacy": "public"
+						}
+					],
 					"events": [],
-					"attributes": [],
+					"attributes": [
+						{
+							"name": "retain"
+						},
+						{
+							"name": "retain-my-info"
+						},
+						{
+							"name": "retain-my-info-label"
+						},
+						{
+							"name": "retain-my-info-selector"
+						},
+						{
+							"name": "storage-key"
+						}
+					],
 					"superclass": {
 						"name": "HTMLElement"
 					},

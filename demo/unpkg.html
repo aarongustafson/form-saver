@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>COMPONENT-NAME via unpkg</title>
+		<title>form-saver via unpkg</title>
 		<link rel="stylesheet" href="./styles.css" />
 		<style>
 			/* Demo-specific styles */
@@ -16,12 +16,22 @@
 			<code>unpkg</code> and registers the element when supported.
 		</p>
 
-		<COMPONENT-NAME>
-			<p>Replace this markup once you customize COMPONENT-NAME.</p>
-		</COMPONENT-NAME>
+		<form-saver>
+			<form action="/demo-contact" method="post">
+				<label>
+					Name
+					<input name="name" />
+				</label>
+				<label>
+					Email
+					<input name="email" type="email" />
+				</label>
+				<button type="submit">Send</button>
+			</form>
+		</form-saver>
 
 		<script type="module">
-			import { defineComponentName } from 'https://unpkg.com/@aarongustafson/COMPONENT-NAME@latest/define.js?module';
+			import { defineComponentName } from 'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';
 
 			defineComponentName();
 		</script>

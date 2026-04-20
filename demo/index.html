@@ -13,7 +13,8 @@
 		<header>
 			<h1>&lt;form-saver&gt;</h1>
 			<p>
-				A web component that stores (and restores) values within the form it wraps See the
+				A web component that stores (and restores) values within the
+				form it wraps See the
 				<a
 					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
 					>README</a
@@ -26,18 +27,59 @@
 			<!-- Basic Example -->
 			<section>
 				<h2>Basic Example</h2>
-				<p>A simple demonstration of the component.</p>
+				<p>
+					Saves and restores field values for the first form inside
+					<code>&lt;form-saver&gt;</code>.
+				</p>
 
 				<div class="demo-section">
 					<h3>Basic Usage</h3>
-					<p>Description of this example.</p>
+					<p>
+						Type into this form and refresh the page to see values
+						restored.
+					</p>
 					<div class="code-demo-pair">
 						<pre><code>&lt;form-saver&gt;
-  &lt;p&gt;Content goes here&lt;/p&gt;
+  &lt;form action="/contact" method="post"&gt;
+    &lt;label&gt;
+      Name
+      &lt;input name="name" autocomplete="name" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Email
+      &lt;input name="email" type="email" autocomplete="email" /&gt;
+    &lt;/label&gt;
+    &lt;label&gt;
+      Message
+      &lt;textarea name="message"&gt;&lt;/textarea&gt;
+    &lt;/label&gt;
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
 &lt;/form-saver&gt;</code></pre>
 						<div class="demo">
 							<form-saver>
-								<p>Content goes here</p>
+								<form action="/contact" method="post">
+									<label>
+										Name
+										<input
+											name="name"
+											autocomplete="name"
+										/>
+									</label>
+									<label>
+										Email
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+										/>
+									</label>
+									<label>
+										Message
+										<textarea name="message"></textarea>
+									</label>
+									<button type="submit">Send</button>
+								</form>
 							</form-saver>
 						</div>
 					</div>
@@ -47,18 +89,52 @@
 			<!-- Example with Attributes -->
 			<section>
 				<h2>Example with Attributes</h2>
-				<p>Demonstrating component attributes.</p>
+				<p>
+					Retain selected fields after submit and allow users to opt
+					in.
+				</p>
 
 				<div class="demo-section">
 					<h3>Using Attributes</h3>
-					<p>Description of this example with attributes.</p>
+					<p>
+						This injects an accessible checkbox before the submit
+						button. Only the retained fields persist after a
+						successful submit flow.
+					</p>
 					<div class="code-demo-pair">
-						<pre><code>&lt;form-saver example-attribute="value"&gt;
-  &lt;p&gt;Content with attributes&lt;/p&gt;
+						<pre><code>&lt;form-saver
+  retain="name email"
+  retain-choice
+  retain-choice-label="Store my contact information for later"
+&gt;
+  &lt;form action="/contact" method="post"&gt;
+    &lt;input name="name" /&gt;
+    &lt;input name="email" type="email" /&gt;
+    &lt;textarea name="message"&gt;&lt;/textarea&gt;
+    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+  &lt;/form&gt;
 &lt;/form-saver&gt;</code></pre>
 						<div class="demo">
-							<form-saver example-attribute="value">
-								<p>Content with attributes</p>
+							<form-saver
+								retain="name email"
+								retain-choice
+								retain-choice-label="Store my contact information for later"
+							>
+								<form action="/contact" method="post">
+									<label>
+										Name
+										<input name="name" />
+									</label>
+									<label>
+										Email
+										<input name="email" type="email" />
+									</label>
+									<label>
+										Message
+										<textarea name="message"></textarea>
+									</label>
+									<button type="submit">Submit</button>
+								</form>
 							</form-saver>
 						</div>
 					</div>
@@ -84,8 +160,7 @@
 				Made with ❤️ by
 				<a href="https://github.com/aarongustafson">Aaron Gustafson</a>.
 				View the source on
-				<a href="https://github.com/aarongustafson/form-saver"
-					>GitHub</a
+				<a href="https://github.com/aarongustafson/form-saver">GitHub</a
 				>.
 			</p>
 		</footer>
