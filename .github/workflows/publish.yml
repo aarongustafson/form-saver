@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_mode:
+        description: "Choose whether to perform a dry run or publish"
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - publish
 
 permissions:
   id-token: write # Required for OIDC
@@ -14,16 +24,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20.x"
+          node-version: "24.x"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Update npm
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -31,5 +38,10 @@ jobs:
       - name: Run tests
         run: npm run test:run
 
+      - name: Dry run npm publish
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_mode != 'publish'
+        run: npm publish --dry-run --access public
+
       - name: Publish to npm
-        run: npm publish
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_mode == 'publish')
+        run: npm publish --provenance --access public
