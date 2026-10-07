@@ -324,3 +324,12 @@ small {
 .api-reference a {
   color: inherit;
 }
+
+@media (forced-colors: active) {
+	pre code mark,
+	.note,
+	.api-reference {
+		background: Highlight;
+		color: HighlightText;
+	}
+}
