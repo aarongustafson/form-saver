@@ -24,6 +24,7 @@
 	"types": "form-saver.d.ts",
 	"exports": {
 		".": {
+			"types": "./form-saver.d.ts",
 			"import": "./index.js"
 		},
 		"./form-saver.js": {
@@ -45,10 +46,9 @@
 		"LICENSE"
 	],
 	"engines": {
-		"node": ">=20.0.0"
+		"node": ">=22.0.0"
 	},
 	"scripts": {
-		"setup": "node scripts/setup.js",
 		"test": "vitest",
 		"test:ui": "vitest --ui",
 		"test:run": "vitest run",
