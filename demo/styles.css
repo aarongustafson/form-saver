@@ -300,6 +300,11 @@ small {
 	border-radius: 4px;
 }
 
+.note code {
+	background: transparent;
+	color: inherit;
+}
+
 .note strong {
 	display: block;
 	margin-block-end: 0.5rem;
