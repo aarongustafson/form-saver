@@ -5,10 +5,11 @@
 A web component that stores (and restores) values within the first form it wraps.
 
 It is designed for crash recovery and interrupted sessions:
-- Saves form field values to `localStorage` as users type.
+- Debounces saves to `localStorage` as users type.
 - Restores values when the page is loaded again.
 - Clears saved values after a successful submit flow.
 - Optionally retains selected fields after submit.
+- Never saves or restores password fields.
 
 ## Demo
 
@@ -150,14 +151,50 @@ Where `method` and `action` come from the wrapped form.
 | `restoreFormState()` | Applies saved values to current fields |
 | `clearSavedData()` | Removes saved values for the current form key |
 
+Calls to `saveFormState()` save immediately. Saves triggered by `input` and
+`change` events use a short debounce to avoid serializing the complete form and
+writing to `localStorage` for every keystroke. Pending changes are flushed when
+the page is hidden.
+
 ## Field Support
 
 Supported controls include:
-- `input` (except `type="file"`, `submit`, `button`, `reset`, and `image`)
+- `input` (except `type="password"`, `file`, `submit`, `button`, `reset`, and `image`)
 - `textarea`
 - `select` (single and multiple)
 
-File fields are intentionally excluded.
+File and password fields are always excluded. Password values are neither saved
+nor restored, even if their field names appear in `retain`.
+
+## Privacy and Storage Errors
+
+Saved values are stored as plain text in `localStorage`. Any JavaScript running
+on the same origin can read them, so avoid wrapping forms that collect other
+sensitive information that should not persist on the device. The component
+automatically removes identifiable password entries written by earlier
+versions when it reads saved state.
+
+If a browser blocks `localStorage`, its quota is exhausted, or another storage
+operation fails, the component dispatches a bubbling, composed
+`form-saver-error` event. Its `detail` contains:
+
+```javascript
+{
+  operation: 'read' | 'write' | 'remove',
+  error: Error
+}
+```
+
+For example:
+
+```javascript
+document.querySelector('form-saver').addEventListener(
+  'form-saver-error',
+  ({ detail }) => {
+    console.error(`Could not ${detail.operation} saved form data`, detail.error);
+  },
+);
+```
 
 ## Browser Support
 

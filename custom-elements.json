@@ -70,7 +70,15 @@
 							"privacy": "public"
 						}
 					],
-					"events": [],
+					"events": [
+						{
+							"name": "form-saver-error",
+							"description": "Fired when localStorage cannot be read, written, or cleared.",
+							"type": {
+								"text": "CustomEvent<{ operation: 'read' | 'write' | 'remove'; error: unknown }>"
+							}
+						}
+					],
 					"attributes": [
 						{
 							"name": "retain",
