@@ -1,6 +1,6 @@
 {
 	"name": "@aarongustafson/form-saver",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"description": "A web component that stores (and restores) values within the form it wraps",
 	"keywords": [
 		"html",
