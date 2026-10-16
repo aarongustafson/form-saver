@@ -8,9 +8,12 @@
  * @attr {string} retain-choice-label - Label text for the injected retention checkbox.
  * @attr {string} retain-choice-container - Optional selector for a container element into which the retention checkbox is placed.
  * @attr {string} storage-key - Optional explicit storage key override.
+ * @fires form-saver-error - Fired when localStorage cannot be read, written, or cleared.
  */
 export class FormSaverElement extends HTMLElement {
 	// ---- Static members ----
+
+	static _autosaveDelay = 150;
 
 	static get observedAttributes() {
 		return [
@@ -22,20 +25,8 @@ export class FormSaverElement extends HTMLElement {
 		];
 	}
 
-	// Checked once at class-definition time; avoids repeated try/catch per read/write.
-	static _storageAvailable = (() => {
-		try {
-			const test_key = '__form_saver_test__';
-			window.localStorage.setItem(test_key, '1');
-			window.localStorage.removeItem(test_key);
-			return true;
-		} catch {
-			return false;
-		}
-	})();
-
 	static _serializeForm($form) {
-		const state = {};
+		const state = Object.create(null);
 
 		for (const element of $form.elements) {
 			if (
@@ -50,7 +41,7 @@ export class FormSaverElement extends HTMLElement {
 				continue;
 			}
 
-			if (!state[key]) {
+			if (!Object.hasOwn(state, key)) {
 				state[key] = [];
 			}
 
@@ -72,7 +63,11 @@ export class FormSaverElement extends HTMLElement {
 			}
 
 			const key = FormSaverElement._getFieldKey(element);
-			if (!key || !state[key]) {
+			if (
+				!key ||
+				!Object.hasOwn(state, key) ||
+				!Array.isArray(state[key])
+			) {
 				continue;
 			}
 
@@ -97,7 +92,7 @@ export class FormSaverElement extends HTMLElement {
 		}
 
 		if (element instanceof HTMLInputElement) {
-			if (element.type === 'file') {
+			if (element.type === 'file' || element.type === 'password') {
 				return false;
 			}
 
@@ -147,6 +142,14 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	static _applyControlValue(element, saved_value) {
+		if (
+			!saved_value ||
+			typeof saved_value !== 'object' ||
+			Array.isArray(saved_value)
+		) {
+			return;
+		}
+
 		if (element instanceof HTMLInputElement) {
 			if (element.type === 'checkbox' || element.type === 'radio') {
 				element.checked = Boolean(saved_value.checked);
@@ -172,33 +175,71 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	static _saveToStorage(storage_key, payload) {
-		if (!FormSaverElement._storageAvailable) {
-			return;
-		}
-
 		window.localStorage.setItem(storage_key, JSON.stringify(payload));
 	}
 
 	static _readFromStorage(storage_key) {
-		if (!FormSaverElement._storageAvailable) {
+		const value = window.localStorage.getItem(storage_key);
+		if (!value) {
 			return null;
 		}
 
 		try {
-			const value = window.localStorage.getItem(storage_key);
-			return value ? JSON.parse(value) : null;
-		} catch {
+			return JSON.parse(value);
+		} catch (error) {
 			// Corrupted stored value; treat as empty.
-			return null;
+			if (error instanceof SyntaxError) {
+				return null;
+			}
+
+			throw error;
 		}
 	}
 
 	static _removeFromStorage(storage_key) {
-		if (!FormSaverElement._storageAvailable) {
-			return;
+		window.localStorage.removeItem(storage_key);
+	}
+
+	static _sanitizeStoredState(value) {
+		if (!value || typeof value !== 'object' || Array.isArray(value)) {
+			return { state: null, changed: value !== null };
 		}
 
-		window.localStorage.removeItem(storage_key);
+		const state = Object.create(null);
+		let changed = false;
+
+		for (const [key, saved_values] of Object.entries(value)) {
+			if (!Array.isArray(saved_values)) {
+				changed = true;
+				continue;
+			}
+
+			const safe_values = saved_values.filter((saved_value) => {
+				const is_valid =
+					saved_value &&
+					typeof saved_value === 'object' &&
+					!Array.isArray(saved_value);
+				const is_password = is_valid && saved_value.type === 'password';
+
+				if (!is_valid || is_password) {
+					changed = true;
+					return false;
+				}
+
+				return true;
+			});
+
+			if (safe_values.length > 0) {
+				state[key] = safe_values;
+			} else if (saved_values.length > 0) {
+				changed = true;
+			}
+		}
+
+		return {
+			state: Object.keys(state).length > 0 ? state : null,
+			changed,
+		};
 	}
 
 	static _uuid() {
@@ -222,8 +263,9 @@ export class FormSaverElement extends HTMLElement {
 			form: null,
 			storageKey: null,
 			retainCheckbox: null,
+			autosaveTimer: null,
 			domReadyHandler: null,
-			boundSaveHandler: () => this.saveFormState(),
+			boundSaveHandler: () => this._scheduleSave(),
 			boundSubmitHandler: (event) => this._handleSubmit(event),
 			boundPageHideHandler: () => this._handlePageHide(),
 			boundResetHandler: () => {
@@ -268,6 +310,7 @@ export class FormSaverElement extends HTMLElement {
 		}
 
 		this._removeFormListeners();
+		this._cancelPendingSave();
 		window.removeEventListener(
 			'pagehide',
 			this._internals.boundPageHideHandler,
@@ -385,19 +428,21 @@ export class FormSaverElement extends HTMLElement {
 			return;
 		}
 
-		FormSaverElement._removeFromStorage(this._internals.storageKey);
+		this._removeSavedState();
 	}
 
 	/**
-	 * Saves current form state into localStorage.
+	 * Immediately saves current form state into localStorage.
 	 */
 	saveFormState() {
+		this._cancelPendingSave();
+
 		if (!this._internals.form || !this._internals.storageKey) {
 			return;
 		}
 
 		const payload = FormSaverElement._serializeForm(this._internals.form);
-		FormSaverElement._saveToStorage(this._internals.storageKey, payload);
+		this._writeSavedState(payload);
 	}
 
 	/**
@@ -408,9 +453,7 @@ export class FormSaverElement extends HTMLElement {
 			return;
 		}
 
-		const saved_state = FormSaverElement._readFromStorage(
-			this._internals.storageKey,
-		);
+		const saved_state = this._readSavedState();
 		if (!saved_state) {
 			return;
 		}
@@ -478,15 +521,15 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	_handlePageHide() {
+		this._flushPendingSave();
+
 		if (!this._internals.pendingSubmit || !this._internals.storageKey) {
 			return;
 		}
 
 		const retained_fields = this._retainedFieldNames;
 		if (retained_fields.size > 0 && this._shouldRetainAfterSubmit()) {
-			const saved_state = FormSaverElement._readFromStorage(
-				this._internals.storageKey,
-			);
+			const saved_state = this._readSavedState();
 			if (saved_state) {
 				const filtered_state = Object.fromEntries(
 					Object.entries(saved_state).filter(([field_name]) =>
@@ -495,21 +538,97 @@ export class FormSaverElement extends HTMLElement {
 				);
 
 				if (Object.keys(filtered_state).length > 0) {
-					FormSaverElement._saveToStorage(
-						this._internals.storageKey,
-						filtered_state,
-					);
+					this._writeSavedState(filtered_state);
 				} else {
-					FormSaverElement._removeFromStorage(
-						this._internals.storageKey,
-					);
+					this._removeSavedState();
 				}
+			} else {
+				this._removeSavedState();
 			}
 		} else {
-			FormSaverElement._removeFromStorage(this._internals.storageKey);
+			this._removeSavedState();
 		}
 
 		this._internals.pendingSubmit = false;
+	}
+
+	_scheduleSave() {
+		this._cancelPendingSave();
+		this._internals.autosaveTimer = window.setTimeout(() => {
+			this._internals.autosaveTimer = null;
+			this.saveFormState();
+		}, FormSaverElement._autosaveDelay);
+	}
+
+	_flushPendingSave() {
+		if (this._internals.autosaveTimer === null) {
+			return;
+		}
+
+		this._cancelPendingSave();
+		this.saveFormState();
+	}
+
+	_cancelPendingSave() {
+		if (this._internals.autosaveTimer === null) {
+			return;
+		}
+
+		window.clearTimeout(this._internals.autosaveTimer);
+		this._internals.autosaveTimer = null;
+	}
+
+	_readSavedState() {
+		try {
+			const stored_state = FormSaverElement._readFromStorage(
+				this._internals.storageKey,
+			);
+			const { state, changed } =
+				FormSaverElement._sanitizeStoredState(stored_state);
+
+			if (changed) {
+				if (state) {
+					this._writeSavedState(state);
+				} else {
+					this._removeSavedState();
+				}
+			}
+
+			return state;
+		} catch (error) {
+			this._reportStorageError('read', error);
+			return null;
+		}
+	}
+
+	_writeSavedState(state) {
+		try {
+			FormSaverElement._saveToStorage(this._internals.storageKey, state);
+			return true;
+		} catch (error) {
+			this._reportStorageError('write', error);
+			return false;
+		}
+	}
+
+	_removeSavedState() {
+		try {
+			FormSaverElement._removeFromStorage(this._internals.storageKey);
+			return true;
+		} catch (error) {
+			this._reportStorageError('remove', error);
+			return false;
+		}
+	}
+
+	_reportStorageError(operation, error) {
+		this.dispatchEvent(
+			new CustomEvent('form-saver-error', {
+				bubbles: true,
+				composed: true,
+				detail: { operation, error },
+			}),
+		);
 	}
 
 	get _retainedFieldNames() {

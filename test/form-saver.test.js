@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FormSaverElement } from '../form-saver.js';
 
 describe('FormSaverElement', () => {
@@ -11,6 +11,8 @@ describe('FormSaverElement', () => {
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
 		host.remove();
 		window.localStorage.clear();
 	});
@@ -72,10 +74,11 @@ describe('FormSaverElement', () => {
 	});
 
 	describe('Save and Restore', () => {
-		it('saves supported fields and ignores file inputs', () => {
+		it('saves supported fields and ignores file and password inputs', () => {
 			const { element } = setupFormSaver(`
 				<form action="/save-profile" method="post">
 					<input name="text" value="Hello" />
+					<input type="password" name="password" value="secret" />
 					<textarea name="notes">Details</textarea>
 					<input type="checkbox" name="agree" checked />
 					<input type="radio" name="plan" value="basic" checked />
@@ -108,7 +111,25 @@ describe('FormSaverElement', () => {
 			expect(saved.plan).toHaveLength(2);
 			expect(saved.country[0].value).toBe('us');
 			expect(saved.topics[0].values).toEqual(['a', 'b']);
+			expect(saved.password).toBeUndefined();
 			expect(saved.resume).toBeUndefined();
+		});
+
+		it('supports field names that overlap object prototype properties', () => {
+			const { element } = setupFormSaver(`
+				<form action="/unusual-names" method="post">
+					<input name="constructor" value="safe" />
+				</form>
+			`);
+
+			expect(() => element.saveFormState()).not.toThrow();
+
+			const action = new URL('/unusual-names', window.location.href).href;
+			const saved = JSON.parse(
+				window.localStorage.getItem(`form-saver:post:${action}`),
+			);
+
+			expect(saved.constructor[0].value).toBe('safe');
 		});
 
 		it('restores saved values on connect (DOM ready path)', () => {
@@ -139,6 +160,163 @@ describe('FormSaverElement', () => {
 			expect(form.elements.plan[0].checked).toBe(false);
 			expect(form.elements.plan[1].checked).toBe(true);
 		});
+
+		it('never restores passwords and scrubs legacy password values', () => {
+			const action = new URL('/legacy-password', window.location.href)
+				.href;
+			const key = `form-saver:post:${action}`;
+			window.localStorage.setItem(
+				key,
+				JSON.stringify({
+					username: [{ type: 'text', value: 'Ada' }],
+					password: [{ type: 'password', value: 'secret' }],
+				}),
+			);
+
+			const { form } = setupFormSaver(`
+				<form action="/legacy-password" method="post">
+					<input name="username" value="" />
+					<input type="password" name="password" value="" />
+				</form>
+			`);
+
+			expect(form.elements.username.value).toBe('Ada');
+			expect(form.elements.password.value).toBe('');
+			expect(JSON.parse(window.localStorage.getItem(key))).toEqual({
+				username: [{ type: 'text', value: 'Ada' }],
+			});
+		});
+
+		it('ignores malformed saved field values', () => {
+			const action = new URL('/malformed', window.location.href).href;
+			window.localStorage.setItem(
+				`form-saver:post:${action}`,
+				JSON.stringify({
+					name: 'not-an-array',
+					email: [null, 'not-an-object'],
+				}),
+			);
+
+			const { form } = setupFormSaver(`
+				<form action="/malformed" method="post">
+					<input name="name" value="Original" />
+					<input name="email" value="original@example.com" />
+				</form>
+			`);
+
+			expect(form.elements.name.value).toBe('Original');
+			expect(form.elements.email.value).toBe('original@example.com');
+		});
+	});
+
+	describe('Autosave', () => {
+		it('debounces event-driven saves', () => {
+			vi.useFakeTimers();
+			const { form } = setupFormSaver(`
+				<form action="/debounce" method="post">
+					<input name="message" value="" />
+				</form>
+			`);
+			const key = `form-saver:post:${new URL('/debounce', window.location.href).href}`;
+
+			form.elements.message.value = 'first';
+			form.elements.message.dispatchEvent(
+				new Event('input', { bubbles: true }),
+			);
+			form.elements.message.value = 'latest';
+			form.elements.message.dispatchEvent(
+				new Event('input', { bubbles: true }),
+			);
+
+			expect(window.localStorage.getItem(key)).toBeNull();
+			vi.advanceTimersByTime(FormSaverElement._autosaveDelay);
+
+			const saved = JSON.parse(window.localStorage.getItem(key));
+			expect(saved.message[0].value).toBe('latest');
+		});
+
+		it('flushes a pending autosave on pagehide', () => {
+			vi.useFakeTimers();
+			const { form } = setupFormSaver(`
+				<form action="/pagehide-flush" method="post">
+					<input name="message" value="latest" />
+				</form>
+			`);
+			const key = `form-saver:post:${new URL('/pagehide-flush', window.location.href).href}`;
+
+			form.elements.message.dispatchEvent(
+				new Event('input', { bubbles: true }),
+			);
+			window.dispatchEvent(new Event('pagehide'));
+
+			expect(
+				JSON.parse(window.localStorage.getItem(key)).message[0].value,
+			).toBe('latest');
+		});
+
+		it('cancels pending autosaves when disconnected', () => {
+			vi.useFakeTimers();
+			const { element, form } = setupFormSaver(`
+				<form action="/disconnect" method="post">
+					<input name="message" value="unsaved" />
+				</form>
+			`);
+			const key = `form-saver:post:${new URL('/disconnect', window.location.href).href}`;
+
+			form.elements.message.dispatchEvent(
+				new Event('input', { bubbles: true }),
+			);
+			element.remove();
+			vi.runAllTimers();
+
+			expect(window.localStorage.getItem(key)).toBeNull();
+		});
+	});
+
+	describe('Storage errors', () => {
+		it.each([
+			{
+				operation: 'read',
+				method: '_readFromStorage',
+				run: (element) => element.restoreFormState(),
+			},
+			{
+				operation: 'write',
+				method: '_saveToStorage',
+				run: (element) => element.saveFormState(),
+			},
+			{
+				operation: 'remove',
+				method: '_removeFromStorage',
+				run: (element) => element.clearSavedData(),
+			},
+		])(
+			'emits a form-saver-error event when a $operation fails',
+			({ operation, method, run }) => {
+				const { element } = setupFormSaver(`
+					<form action="/${operation}-error" method="post">
+						<input name="message" value="hello" />
+					</form>
+				`);
+				const error = new DOMException(
+					'Storage unavailable',
+					'SecurityError',
+				);
+				const listener = vi.fn();
+				element.addEventListener('form-saver-error', listener);
+				vi.spyOn(FormSaverElement, method).mockImplementation(() => {
+					throw error;
+				});
+
+				run(element);
+
+				expect(listener).toHaveBeenCalledOnce();
+				expect(listener.mock.calls[0][0].detail).toEqual({
+					operation,
+					error,
+				});
+			},
+		);
 	});
 
 	describe('Submit handling', () => {
@@ -212,6 +390,27 @@ describe('FormSaverElement', () => {
 			const saved = JSON.parse(window.localStorage.getItem(key));
 			expect(saved.email).toBeTruthy();
 			expect(saved.message).toBeUndefined();
+		});
+
+		it('never retains password fields after submit', () => {
+			const { element, form } = setupFormSaver(`
+				<form action="/retain-password" method="post">
+					<input type="password" name="password" value="secret" />
+				</form>
+			`);
+
+			element.setAttribute('retain', 'password');
+			element.saveFormState();
+
+			const action = new URL('/retain-password', window.location.href)
+				.href;
+			const key = `form-saver:post:${action}`;
+			form.dispatchEvent(
+				new Event('submit', { bubbles: true, cancelable: true }),
+			);
+			window.dispatchEvent(new Event('pagehide'));
+
+			expect(window.localStorage.getItem(key)).toBeNull();
 		});
 
 		it('matches retain list by id if name is not present', () => {
