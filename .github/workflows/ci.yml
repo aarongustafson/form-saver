@@ -1,40 +1,52 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+    test:
+        runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [22.x, 24.x, 26.x]
+        strategy:
+            matrix:
+                node-version: [22.x, 24.x, 26.x]
 
-    steps:
-      - uses: actions/checkout@v6
+        steps:
+            - uses: actions/checkout@v6
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Run linter
-        run: npm run lint
+            - name: Run linter
+              run: npm run lint
 
-      - name: Run tests
-        run: npm run test:run
+            - name: Run tests
+              run: npm run test:run
 
-      - name: Generate coverage report
-        run: npm run test:coverage
-        if: matrix.node-version == '22.x'
+            - name: Generate coverage report
+              run: npm run test:coverage
+              if: matrix.node-version == '22.x'
+
+    browser:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22.x
+                  cache: npm
+            - run: npm ci
+            - run: npx playwright install --with-deps chromium firefox webkit
+            - run: npm run test:browser -- --workers=1

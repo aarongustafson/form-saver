@@ -68,6 +68,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 ## Coding Style
 
 This project uses:
+
 - ESLint for code quality
 - Prettier for code formatting
 - Vitest for testing

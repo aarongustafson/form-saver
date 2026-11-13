@@ -5,31 +5,89 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>form-saver via unpkg</title>
 		<link rel="stylesheet" href="./styles.css" />
-		<style>
-			/* Demo-specific styles */
-		</style>
 	</head>
 	<body>
-		<h1>unpkg CDN sanity check</h1>
-		<p>
-			This page loads the guarded definition helper from
-			<code>unpkg</code> and registers the element when supported.
-		</p>
+		<header>
+			<h1>&lt;form-saver&gt; via unpkg</h1>
+			<p>
+				See the
+				<a href="https://github.com/aarongustafson/form-saver#readme"
+					>README</a
+				>
+				for installation and API documentation.
+			</p>
+		</header>
+		<main>
+			<p>
+				This page calls the guarded definition helper. Use invented
+				details: localStorage keeps drafts on this device. Retention
+				choices affect post-submit data, not draft saving.
+			</p>
+			<p>
+				Without JavaScript, or if the CDN module fails, the native form
+				still works, but drafts aren’t saved. Keep a copy before
+				leaving. The placeholder <code>/demo-contact</code> endpoint has
+				no submission service.
+			</p>
+			<section class="demo-section">
+				<h2>Explicit registration helper</h2>
+				<div class="code-demo-pair">
+					<pre><code>import { defineComponentName } from
+  'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';
+defineComponentName();
 
-		<form-saver>
-			<form action="/demo-contact" method="post">
-				<label>
-					Name
-					<input name="name" />
-				</label>
-				<label>
-					Email
-					<input name="email" type="email" />
-				</label>
-				<button type="submit">Send</button>
-			</form>
-		</form-saver>
-
+&lt;form-saver storage-key="demo:unpkg"&gt;
+  &lt;form action="/demo-contact" method="post"&gt;
+    &lt;label&gt;Name &lt;input name="name"&gt;&lt;/label&gt;
+    &lt;label&gt;Email &lt;input name="email" type="email"&gt;&lt;/label&gt;
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/form-saver&gt;</code></pre>
+					<div class="demo">
+						<form-saver storage-key="demo:unpkg">
+							<form action="/demo-contact" method="post">
+								<label
+									>Name
+									<input name="name" autocomplete="name"
+								/></label>
+								<label
+									>Email
+									<input
+										name="email"
+										type="email"
+										autocomplete="email"
+								/></label>
+								<button type="submit">Send</button>
+							</form>
+							<button type="button" data-action="save" disabled>
+								Save draft now
+							</button>
+							<p
+								class="draft-feedback"
+								role="status"
+								data-ready="Draft saving is available. Reload to restore your saved values."
+								data-restored="A stored draft is available. Review the restored fields before submitting."
+								data-saved="Draft saved in this browser. Reload to restore it."
+								data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+							>
+								Draft saving is unavailable until the module
+								loads. Keep a copy before leaving.
+							</p>
+						</form-saver>
+					</div>
+				</div>
+			</section>
+		</main>
+		<footer>
+			<p>
+				Made with ❤️ by
+				<a href="https://github.com/aarongustafson">Aaron Gustafson</a>.
+				View the source on
+				<a href="https://github.com/aarongustafson/form-saver">GitHub</a
+				>.
+			</p>
+		</footer>
+		<script type="module" src="./feedback.js"></script>
 		<script type="module">
 			import { defineComponentName } from 'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';
 
