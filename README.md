@@ -1,6 +1,10 @@
 # form-saver Web Component
 
-[![npm version](https://img.shields.io/npm/v/@aarongustafson/form-saver.svg)](https://www.npmjs.com/package/@aarongustafson/form-saver) [![Build Status](https://img.shields.io/github/actions/workflow/status/aarongustafson/form-saver/ci.yml?branch=main)](https://github.com/aarongustafson/form-saver/actions)
+[![npm version](https://img.shields.io/npm/v/@aarongustafson/form-saver.svg)](https://www.npmjs.com/package/@aarongustafson/form-saver)
+[![CI status](https://img.shields.io/github/actions/workflow/status/aarongustafson/form-saver/ci.yml?branch=main&label=CI)](https://github.com/aarongustafson/form-saver/actions/workflows/ci.yml)
+[![Minified + gzipped size](https://img.shields.io/bundlejs/size/@aarongustafson/form-saver?format=minzip&label=min%2Bgzip)](https://bundlejs.com/?q=@aarongustafson/form-saver)
+[![License](https://img.shields.io/npm/l/@aarongustafson/form-saver)](https://github.com/aarongustafson/form-saver/blob/main/LICENSE)
+[![Type definitions](https://img.shields.io/npm/types/@aarongustafson/form-saver)](https://github.com/aarongustafson/form-saver/blob/main/form-saver.d.ts)
 
 A web component that stores (and restores) values within the first form it wraps.
 
