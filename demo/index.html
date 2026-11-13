@@ -5,16 +5,13 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>&lt;form-saver&gt; Web Component Demo</title>
 		<link rel="stylesheet" href="./styles.css" />
-		<style>
-			/* Demo-specific styles */
-		</style>
 	</head>
 	<body>
 		<header>
 			<h1>&lt;form-saver&gt;</h1>
 			<p>
 				A web component that stores (and restores) values within the
-				form it wraps See the
+				form it wraps. See the
 				<a
 					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
 					>README</a
@@ -24,6 +21,19 @@
 		</header>
 
 		<main>
+			<p>
+				Use invented details: drafts are stored in this browser’s
+				localStorage, including message text. Passwords and files are
+				excluded. The retention checkbox controls what remains after
+				submission, not whether drafts are saved.
+			</p>
+			<p>
+				Without JavaScript, or if the module fails to load, the forms
+				and their native validation still work, but drafts aren’t saved.
+				Keep a copy before leaving. These examples use a placeholder
+				<code>/contact</code> endpoint; no working submission service is
+				provided.
+			</p>
 			<!-- Basic Example -->
 			<section>
 				<h2>Basic Example</h2>
@@ -57,7 +67,7 @@
   &lt;/form&gt;
 &lt;/form-saver&gt;</code></pre>
 						<div class="demo">
-							<form-saver>
+							<form-saver storage-key="demo:basic">
 								<form action="/contact" method="post">
 									<label>
 										Name
@@ -80,6 +90,11 @@
 									</label>
 									<button type="submit">Send</button>
 								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								></p>
 							</form-saver>
 						</div>
 					</div>
@@ -151,6 +166,11 @@
 									</label>
 									<button type="submit">Send</button>
 								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								></p>
 							</form-saver>
 						</div>
 					</div>
@@ -229,6 +249,11 @@
 									</label>
 									<button type="submit">Send</button>
 								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								></p>
 							</form-saver>
 						</div>
 					</div>
@@ -284,6 +309,11 @@
 									</label>
 									<button type="submit">Send</button>
 								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								></p>
 							</form-saver>
 						</div>
 					</div>
@@ -361,6 +391,11 @@
 										<button type="submit">Send</button>
 									</div>
 								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								></p>
 							</form-saver>
 						</div>
 					</div>
@@ -391,6 +426,7 @@
 			</p>
 		</footer>
 
+		<script src="./feedback.js" type="module"></script>
 		<script src="../define.js" type="module"></script>
 	</body>
 </html>
