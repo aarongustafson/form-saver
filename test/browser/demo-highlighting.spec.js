@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
+test.use({ javaScriptEnabled: false });
+
 const css = await readFile(
 	new URL('../../demo/styles.css', import.meta.url),
 	'utf8',
@@ -26,9 +28,8 @@ for (const name of ['index', 'esm', 'unpkg']) {
 			);
 			await page.route('**/*', (route) => route.abort());
 			await page.setContent(
-				html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ''),
+				html.replace('</head>', `<style>${css}</style></head>`),
 			);
-			await page.addStyleTag({ content: css });
 			const marks = page.locator('pre code mark');
 			expect(await marks.count()).toBeGreaterThan(0);
 			const ratios = await marks.evaluateAll((elements) => {
