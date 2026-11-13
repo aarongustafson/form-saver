@@ -125,7 +125,9 @@ async function demo(page, file = 'index.html') {
 		}),
 	);
 	await page.goto(`/demo/${file}`);
-	await expect(page.locator('[data-action="save"]').first()).toBeEnabled();
+	await page.evaluate(() =>
+		customElements.whenDefined('form-saver').then(() => {}),
+	);
 }
 
 test('recorded study palettes preserve reading, feedback, fields and button contrast', async ({
@@ -133,6 +135,7 @@ test('recorded study palettes preserve reading, feedback, fields and button cont
 }) => {
 	test.setTimeout(120000);
 	await demo(page);
+	await page.locator('form-saver').first().dispatchEvent('form-saver-error');
 	const style = await page.addStyleTag({ content: css });
 	for (const palette of palettes) {
 		await style.evaluate(
@@ -153,7 +156,6 @@ test('recorded study palettes preserve reading, feedback, fields and button cont
 			'input[name="name"]',
 			'textarea',
 			'button[type="submit"]',
-			'[data-action="save"]',
 		]) {
 			const element = page.locator(selector).first();
 			expect(
@@ -165,7 +167,6 @@ test('recorded study palettes preserve reading, feedback, fields and button cont
 			'input[name="name"]',
 			'textarea',
 			'button[type="submit"]',
-			'[data-action="save"]',
 		]) {
 			expect(
 				(await contrast(page.locator(selector).first())).boundary,
@@ -185,6 +186,10 @@ for (const colorScheme of ['light', 'dark']) {
 	}) => {
 		await page.emulateMedia({ colorScheme });
 		await demo(page);
+		await page
+			.locator('form-saver')
+			.first()
+			.dispatchEvent('form-saver-error');
 		for (const selector of [
 			'body',
 			'.demo',
@@ -219,7 +224,48 @@ for (const colorScheme of ['light', 'dark']) {
 }
 
 for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
-	test(`${file}: native keyboard focus, save/reload, localized error, responsive layout`, async ({
+	test(`${file}: automatic saving adds no manual-save UI`, async ({
+		page,
+	}) => {
+		await demo(page, file);
+		await expect(page.getByRole('button', { name: /save/i })).toHaveCount(
+			0,
+		);
+		await expect(page.locator('[data-action="save"]')).toHaveCount(0);
+		const savers = await page.locator('form-saver').all();
+		for (const [index, saver] of savers.entries()) {
+			await expect(saver.locator('button')).toHaveCount(1);
+			const input = saver.getByLabel('Name', { exact: true });
+			await input.fill(`Automatically retained ${index}`);
+			await expect
+				.poll(() =>
+					saver.evaluate(
+						(saver) =>
+							JSON.parse(localStorage.getItem(saver.storageKey))
+								?.name?.[0]?.value,
+					),
+				)
+				.toBe(`Automatically retained ${index}`);
+			await expect(input).toBeFocused();
+			await expect(saver.getByRole('status')).toBeEmpty();
+			expect(
+				await saver
+					.getByRole('status')
+					.evaluate(
+						(element) => element.getBoundingClientRect().height,
+					),
+			).toBe(0);
+		}
+		await page.reload();
+		for (const [index, saver] of savers.entries()) {
+			await expect(saver.getByLabel('Name', { exact: true })).toHaveValue(
+				`Automatically retained ${index}`,
+			);
+			await expect(saver.getByRole('status')).toBeEmpty();
+		}
+	});
+
+	test(`${file}: native keyboard focus, auto-save/reload, localized error, responsive layout`, async ({
 		page,
 	}) => {
 		await demo(page, file);
@@ -249,17 +295,19 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 			}),
 		).toBe(true);
 		await name.fill('Invented demo name');
-		await saver.locator('[data-action="save"]').focus();
-		await page.keyboard.press('Space');
-		await expect(saver.locator('[role="status"]')).toContainText(
-			'Draft saved',
-		);
-		await expect(saver.locator('[data-action="save"]')).toBeFocused();
+		await expect
+			.poll(() =>
+				saver.evaluate(
+					(saver) =>
+						JSON.parse(localStorage.getItem(saver.storageKey))
+							?.name?.[0]?.value,
+				),
+			)
+			.toBe('Invented demo name');
+		await expect(name).toBeFocused();
 		await page.reload();
 		await expect(name).toHaveValue('Invented demo name');
-		await expect(saver.locator('[role="status"]')).toContainText(
-			'stored draft',
-		);
+		await expect(saver.locator('[role="status"]')).toBeEmpty();
 		await saver.locator('[role="status"]').evaluate((element) => {
 			element.dataset.error = 'No se pudo guardar. Conserva una copia.';
 		});
@@ -269,11 +317,11 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 			};
 		});
 		await name.fill('Still entered');
-		await saver.locator('[data-action="save"]').click();
 		await expect(saver.locator('[role="status"]')).toHaveText(
 			'No se pudo guardar. Conserva una copia.',
 		);
 		await expect(name).toHaveValue('Still entered');
+		await expect(name).toBeFocused();
 		const pair = page.locator('.code-demo-pair').first();
 		const codeBox = await pair.locator('pre').boundingBox();
 		const liveBox = await pair.locator('.demo').boundingBox();
@@ -305,12 +353,11 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		await expect(page.locator('input[name="name"]').first()).toHaveValue(
 			'Not lost',
 		);
-		await expect(
-			page.locator('[data-action="save"]').first(),
-		).toBeDisabled();
-		await expect(page.locator('[role="status"]').first()).toContainText(
-			'unavailable',
+		await expect(page.getByRole('button', { name: /save/i })).toHaveCount(
+			0,
 		);
+		await expect(page.locator('text=Without JavaScript')).toBeVisible();
+		await expect(page.locator('[role="status"]').first()).toBeEmpty();
 		expect(
 			await page
 				.locator('form')
@@ -339,9 +386,9 @@ test('no JavaScript preserves native form controls and recovery text', async ({
 			'Native draft',
 		);
 		await expect(page.locator('text=Without JavaScript')).toBeVisible();
-		await expect(
-			page.locator('[data-action="save"]').first(),
-		).toBeDisabled();
+		await expect(page.getByRole('button', { name: /save/i })).toHaveCount(
+			0,
+		);
 		await page.close();
 	}
 	await context.close();
@@ -383,8 +430,17 @@ test('retention checkbox stays keyboard-operable and draft saving excludes secre
 			if (type === 'password') input.value = 'never-save';
 			form.append(input);
 		}
-		form.closest('form-saver').saveFormState();
+		form.dispatchEvent(new Event('input', { bubbles: true }));
 	});
+	await expect
+		.poll(() =>
+			saver.evaluate(
+				(saver) =>
+					JSON.parse(localStorage.getItem(saver.storageKey))
+						?.name?.[0]?.value,
+			),
+		)
+		.toBe('Draft');
 	const stored = await saver.evaluate((saver) =>
 		JSON.parse(localStorage.getItem(saver.storageKey)),
 	);
@@ -400,7 +456,15 @@ test('canceled submissions, resets and disconnect cleanup preserve native/data s
 	const saver = page.locator('form-saver').first();
 	const input = saver.locator('input[name="name"]');
 	await input.fill('Keep this');
-	await saver.locator('[data-action="save"]').click();
+	await expect
+		.poll(() =>
+			saver.evaluate(
+				(saver) =>
+					JSON.parse(localStorage.getItem(saver.storageKey))
+						?.name?.[0]?.value,
+			),
+		)
+		.toBe('Keep this');
 	await saver.locator('form').evaluate((form) => {
 		form.addEventListener('submit', (event) => event.preventDefault());
 	});
@@ -503,6 +567,7 @@ test('increased contrast preserves full-strength feedback and native focus', asy
 }) => {
 	await page.emulateMedia({ contrast: 'more' });
 	await demo(page);
+	await page.locator('form-saver').first().dispatchEvent('form-saver-error');
 	expect(
 		(await contrast(page.locator('.draft-feedback').first())).text,
 	).toBeGreaterThanOrEqual(4.5);
@@ -539,9 +604,9 @@ test('forced-color emulation keeps automatic adjustment and non-color state feed
 			.locator('body')
 			.evaluate((element) => getComputedStyle(element).forcedColorAdjust),
 	).toBe('auto');
-	await page.locator('[data-action="save"]').first().click();
+	await page.locator('form-saver').first().dispatchEvent('form-saver-error');
 	await expect(page.locator('[role="status"]').first()).toContainText(
-		'Draft saved',
+		'storage is unavailable',
 	);
 });
 
@@ -553,4 +618,49 @@ test('preview is no-cache and does not expose repository metadata', async ({
 	).toBe('no-store');
 	expect((await request.get('/.git/config')).status()).toBe(404);
 	expect((await request.post('/contact')).status()).toBe(405);
+});
+
+test('forced-color surfaces remain paired when gradients are suppressed', async ({
+	page,
+}) => {
+	await page.emulateMedia({ forcedColors: 'active' });
+	await demo(page);
+	test.skip(
+		!(await page.evaluate(
+			() => matchMedia('(forced-colors: active)').matches,
+		)),
+		'Engine does not emulate forced-color media.',
+	);
+	// Substitute a conflicting palette and model the suppression of non-URL
+	// images. This is a deterministic palette check, not OS repainting evidence.
+	await page.addStyleTag({
+		content: substitute(css, [
+			'#000000',
+			'#ffffff',
+			'#ffffff',
+			'#000000',
+			'#ffffff',
+			'#000000',
+		]),
+	});
+	await page.addStyleTag({
+		content:
+			'* { forced-color-adjust: none; background-image: none !important; }',
+	});
+	for (const selector of [
+		'pre',
+		'code',
+		'input[name="name"]',
+		'textarea',
+		'button[type="submit"]',
+	]) {
+		const element = page.locator(selector).first();
+		expect((await contrast(element)).text, selector).toBeGreaterThanOrEqual(
+			4.5,
+		);
+	}
+	await page.locator('button[type="submit"]').first().hover();
+	expect(
+		(await contrast(page.locator('button[type="submit"]').first())).text,
+	).toBeGreaterThanOrEqual(4.5);
 });

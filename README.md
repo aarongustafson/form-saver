@@ -216,18 +216,18 @@ The demos use `CanvasText`/`Canvas` for instructions and feedback,
 `FieldText`/`Field` for fields and code blocks, and
 `ButtonText`/`ButtonFace` for buttons and inline code. Translucent control and
 code surfaces have a Canvas backplate. Browser focus indicators remain intact.
-Forced colors keep automatic adjustment; increased contrast keeps full-strength
-supporting text. These pairs passed the 19 distinct recorded study palettes;
-they aren’t a guarantee for every platform or author override.
+Forced colors use solid `Field` and `ButtonFace` surfaces when gradients are
+suppressed, with automatic adjustment intact. Increased contrast keeps
+full-strength supporting text. These pairs passed the 19 distinct recorded study
+palettes; they aren’t a guarantee for every platform or author override.
 
 The component doesn’t emit saved or restored events or insert status messages.
-The demos provide authored `role="status"` text and a “Save draft now” button
-that calls `saveFormState()`. A synchronous `form-saver-error` prevents a false
-success message. On reload, a stored-draft notice asks the user to review the
-fields; it doesn’t claim that every stored value is valid or applied. The
-`data-ready`, `data-restored`, `data-saved`, and `data-error` strings in the demo
-markup can be translated. They aren’t component attributes. The feedback never
-moves focus or copies field values into announcements.
+Saving happens automatically as people edit the form, without an extra save
+control, routine status message, or focus change. The demos provide empty
+`role="status"` regions that show authored recovery text only when
+`form-saver-error` occurs. The `data-error` string in the demo markup can be
+translated; it isn’t a component attribute. Feedback never copies field values
+into announcements.
 
 Without JavaScript, or if a module fails to load, the native form remains usable,
 but the component can’t save or restore drafts. Provide a working form endpoint

@@ -23,15 +23,20 @@ describe('demo accessibility baseline', () => {
 			expect(html).toContain('data-error=');
 			expect(html).toContain('Without JavaScript');
 			expect(html).toContain('<footer>');
+			expect(html).not.toContain('Save draft now');
+			expect(html).not.toContain('data-action="save"');
+			expect(html).not.toMatch(/data-(ready|restored|saved)=/);
 			const template = document.createElement('template');
 			template.innerHTML = html;
 			for (const saver of template.content.querySelectorAll(
 				'form-saver',
 			)) {
+				const feedback = saver.querySelector('[role="status"]');
 				expect(
-					saver.querySelector('[role="status"]'),
+					feedback,
 					saver.getAttribute('storage-key'),
 				).not.toBeNull();
+				expect(feedback.textContent).toBe('');
 			}
 		},
 	);

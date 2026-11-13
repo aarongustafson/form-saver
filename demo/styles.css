@@ -156,15 +156,15 @@ button:hover {
 		);
 	}
 }
-button:disabled {
-	cursor: default;
-}
 small {
 	display: block;
 	color: inherit;
 	margin-block: 0.5rem 1rem;
 }
 .draft-feedback {
+	margin: 0;
+}
+.draft-feedback:not(:empty) {
 	background: Canvas;
 	color: CanvasText;
 	border-inline-start: 3px solid currentColor;
@@ -186,5 +186,30 @@ small {
 	}
 	button:hover {
 		background-image: linear-gradient(ButtonFace, ButtonFace);
+	}
+}
+
+@media (forced-colors: active) {
+	pre,
+	input:not(
+		[type='checkbox'],
+		[type='radio'],
+		[type='submit'],
+		[type='reset']
+	),
+	select,
+	textarea {
+		background: Field;
+		color: FieldText;
+	}
+	code,
+	button,
+	button:hover {
+		background: ButtonFace;
+		color: ButtonText;
+	}
+	pre code {
+		background: none;
+		color: inherit;
 	}
 }
