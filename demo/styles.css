@@ -164,6 +164,13 @@ small {
 .draft-feedback {
 	margin: 0;
 }
+pre code mark {
+	background: Mark;
+	color: MarkText;
+	border-radius: 2px;
+	padding: 0.125rem 0.25rem;
+	font-weight: 600;
+}
 .draft-feedback:not(:empty) {
 	background: Canvas;
 	color: CanvasText;

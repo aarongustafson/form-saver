@@ -120,7 +120,7 @@ async function demo(page, file = 'index.html') {
 			contentType: 'text/javascript',
 			body: definition.replace(
 				"'./form-saver.js'",
-				"'http://127.0.0.1:4192/form-saver.js'",
+				`'http://127.0.0.1:${process.env.PORT || 4192}/form-saver.js'`,
 			),
 		}),
 	);
@@ -380,7 +380,7 @@ test('no JavaScript preserves native form controls and recovery text', async ({
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		const page = await context.newPage();
-		await page.goto(`http://127.0.0.1:4192/demo/${file}`);
+		await page.goto(`/demo/${file}`);
 		await page.locator('input[name="name"]').first().fill('Native draft');
 		await expect(page.locator('input[name="name"]').first()).toHaveValue(
 			'Native draft',
