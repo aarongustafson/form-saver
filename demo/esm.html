@@ -32,17 +32,19 @@
 			<section class="demo-section">
 				<h2>Class-only import</h2>
 				<div class="code-demo-pair">
-					<pre><code>import { FormSaverElement } from
-  'https://esm.sh/@aarongustafson/form-saver@1.0.2/form-saver.js?bundle&amp;target=es2022';
-customElements.define('form-saver', FormSaverElement);
+					<pre
+						tabindex="0"
+					><code><mark>import { FormSaverElement } from
+  'https://esm.sh/@aarongustafson/form-saver@1.0.2/form-saver.js?bundle&amp;target=es2022';</mark>
+<mark>customElements.define('form-saver', FormSaverElement);</mark>
 
-&lt;form-saver storage-key="demo:esm"&gt;
+<mark>&lt;form-saver storage-key="demo:esm"&gt;</mark>
   &lt;form action="/demo-contact" method="post"&gt;
     &lt;label&gt;Name &lt;input name="name"&gt;&lt;/label&gt;
     &lt;label&gt;Email &lt;input name="email" type="email"&gt;&lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
-&lt;/form-saver&gt;</code></pre>
+<mark>&lt;/form-saver&gt;</mark></code></pre>
 					<div class="demo">
 						<form-saver storage-key="demo:esm">
 							<form action="/demo-contact" method="post">

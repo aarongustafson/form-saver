@@ -32,17 +32,19 @@
 			<section class="demo-section">
 				<h2>Explicit registration helper</h2>
 				<div class="code-demo-pair">
-					<pre><code>import { defineComponentName } from
-  'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';
-defineComponentName();
+					<pre
+						tabindex="0"
+					><code><mark>import { defineComponentName } from
+  'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';</mark>
+<mark>defineComponentName();</mark>
 
-&lt;form-saver storage-key="demo:unpkg"&gt;
+<mark>&lt;form-saver storage-key="demo:unpkg"&gt;</mark>
   &lt;form action="/demo-contact" method="post"&gt;
     &lt;label&gt;Name &lt;input name="name"&gt;&lt;/label&gt;
     &lt;label&gt;Email &lt;input name="email" type="email"&gt;&lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
-&lt;/form-saver&gt;</code></pre>
+<mark>&lt;/form-saver&gt;</mark></code></pre>
 					<div class="demo">
 						<form-saver storage-key="demo:unpkg">
 							<form action="/demo-contact" method="post">

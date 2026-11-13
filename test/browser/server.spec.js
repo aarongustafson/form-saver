@@ -8,7 +8,7 @@ test('malformed request target returns 400 without terminating the preview', asy
 		const raw = httpRequest(
 			{
 				hostname: '127.0.0.1',
-				port: 4192,
+				port: Number(process.env.PORT || 4192),
 				path: '//[',
 				method: 'GET',
 			},
