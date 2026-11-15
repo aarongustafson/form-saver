@@ -55,6 +55,7 @@ footer {
 
 .demo-section,
 .api-reference {
+	margin-trim: block;
 	margin-block: 2rem;
 	padding: 1.5rem;
 	background: Canvas;
