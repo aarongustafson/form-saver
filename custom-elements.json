@@ -13,6 +13,14 @@
 					"members": [
 						{
 							"kind": "field",
+							"name": "script",
+							"type": { "text": "string | null" },
+							"description": "Module URL whose default initializer returns beforeSave and beforeRestore hooks.",
+							"privacy": "public",
+							"attribute": "script"
+						},
+						{
+							"kind": "field",
 							"name": "retain",
 							"type": { "text": "string | null" },
 							"description": "Space-separated list of field names (or ids as fallback) to retain after a successful form submission.",
@@ -54,14 +62,20 @@
 						{
 							"kind": "method",
 							"name": "saveFormState",
-							"description": "Serializes and persists the current form field values to localStorage.",
-							"privacy": "public"
+							"description": "Serializes and persists the current form field values, asynchronously when a script is configured.",
+							"privacy": "public",
+							"return": {
+								"type": { "text": "void | Promise<void>" }
+							}
 						},
 						{
 							"kind": "method",
 							"name": "restoreFormState",
 							"description": "Applies previously saved field values to the current form.",
-							"privacy": "public"
+							"privacy": "public",
+							"return": {
+								"type": { "text": "void | Promise<void>" }
+							}
 						},
 						{
 							"kind": "method",
@@ -73,13 +87,19 @@
 					"events": [
 						{
 							"name": "form-saver-error",
-							"description": "Fired when localStorage cannot be read, written, or cleared.",
+							"description": "Fired when storage, module initialization, or a transformation fails.",
 							"type": {
-								"text": "CustomEvent<{ operation: 'read' | 'write' | 'remove'; error: unknown }>"
+								"text": "CustomEvent<{ operation: 'read' | 'write' | 'remove' | 'initialize' | 'beforeSave' | 'beforeRestore'; error: unknown }>"
 							}
 						}
 					],
 					"attributes": [
+						{
+							"name": "script",
+							"type": { "text": "string" },
+							"description": "Application module URL resolved against the document base URI. Its default initializer returns storage transformation hooks.",
+							"fieldName": "script"
+						},
 						{
 							"name": "retain",
 							"type": { "text": "string" },

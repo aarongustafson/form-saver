@@ -8,12 +8,48 @@
  * @attr {string} retain-choice-label - Label text for the injected retention checkbox.
  * @attr {string} retain-choice-container - Optional selector for a container element into which the retention checkbox is placed.
  * @attr {string} storage-key - Optional explicit storage key override.
- * @fires form-saver-error - Fired when localStorage cannot be read, written, or cleared.
+ * @attr {string} script - Module URL whose default initializer returns storage transformation hooks.
+ * @fires form-saver-error - Fired when storage, module initialization, or a transformation fails.
  */
 export interface FormSaverErrorDetail {
-	operation: 'read' | 'write' | 'remove';
+	operation:
+		| 'read'
+		| 'write'
+		| 'remove'
+		| 'initialize'
+		| 'beforeSave'
+		| 'beforeRestore';
 	error: unknown;
 }
+
+export type FormSaverControlState = {
+	type: string;
+	value?: string;
+	checked?: boolean;
+	values?: string[];
+};
+
+export type FormSaverState = Record<string, FormSaverControlState[]>;
+export type FormSaverPayload =
+	| null
+	| boolean
+	| number
+	| string
+	| FormSaverPayload[]
+	| { [key: string]: FormSaverPayload };
+
+export interface FormSaverStorageHooks {
+	beforeSave(
+		state: FormSaverState,
+	): FormSaverPayload | Promise<FormSaverPayload>;
+	beforeRestore(
+		payload: FormSaverPayload,
+	): FormSaverState | Promise<FormSaverState>;
+}
+
+export type FormSaverStorageInitializer = (
+	element: FormSaverElement,
+) => FormSaverStorageHooks | Promise<FormSaverStorageHooks>;
 
 export class FormSaverElement extends HTMLElement {
 	/**
@@ -63,14 +99,20 @@ export class FormSaverElement extends HTMLElement {
 	set storageKey(value: string | null | undefined);
 
 	/**
-	 * Immediately saves current form state into localStorage.
+	 * Module URL resolved against the element's document base URI.
 	 */
-	saveFormState(): void;
+	get script(): string | null;
+	set script(value: string | null | undefined);
+
+	/**
+	 * Saves current form state, asynchronously when a script is configured.
+	 */
+	saveFormState(): void | Promise<void>;
 
 	/**
 	 * Restores form state from localStorage.
 	 */
-	restoreFormState(): void;
+	restoreFormState(): void | Promise<void>;
 
 	/**
 	 * Clears persisted data for this form.

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Encrypted drafts - &lt;form-saver&gt;</title>
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body>
+		<header>
+			<h1>Encrypted drafts</h1>
+			<p><a href="./index.html">All form-saver examples</a></p>
+		</header>
+		<main>
+			<section>
+				<h2>Application-owned storage transformations</h2>
+				<p>
+					Use invented details only. This example uses a
+					<strong>public, predictable demo key</strong>, so anyone can
+					decrypt its drafts. It demonstrates the hooks, not secure
+					key management or GDPR compliance.
+				</p>
+				<p>
+					Type a name or message, wait briefly for autosave, then
+					reload to restore it. Inspect the
+					<code>demo:encrypted</code> localStorage entry to see the
+					version, algorithm, fresh IV, and ciphertext instead of
+					field values. The <a href="./draft-storage.js">module</a>
+					uses Web Crypto AES-GCM entirely in your browser and never
+					sends form values or keys over the network.
+				</p>
+				<p>
+					A real application must replace the demo key with one
+					authorized by its backend session, never store the key
+					alongside the draft, and revoke access on logout or session
+					expiry. Encryption cannot protect against malicious
+					same-origin scripts, or another person whose browser session
+					still authorizes the key.
+				</p>
+				<p>
+					The retention checkbox controls which fields survive
+					submission, not whether drafts are saved while typing.
+					Asynchronous saves may not finish if you immediately close
+					or leave the page. Without JavaScript, or if the module
+					fails, the native form remains usable but drafts are not
+					saved. Keep a copy before leaving. The
+					<code>/contact</code> endpoint is a placeholder, not a
+					submission service. Web Crypto requires HTTPS or localhost.
+				</p>
+				<div class="code-demo-pair">
+					<pre tabindex="0"><code><mark>&lt;form-saver
+  script="./draft-storage.js"
+  storage-key="demo:encrypted"
+  retain="name email"
+  retain-choice
+&gt;</mark>
+  &lt;form action="/contact" method="post"&gt;
+    &lt;!-- Native labelled fields --&gt;
+  &lt;/form&gt;
+<mark>&lt;/form-saver&gt;</mark></code></pre>
+					<div class="demo">
+						<form-saver
+							script="./draft-storage.js"
+							storage-key="demo:encrypted"
+							retain="name email"
+							retain-choice
+						>
+							<form action="/contact" method="post">
+								<label>
+									Name
+									<input name="name" autocomplete="name" />
+								</label>
+								<label>
+									Email
+									<input
+										name="email"
+										type="email"
+										autocomplete="email"
+									/>
+								</label>
+								<label>
+									Message
+									<textarea name="message"></textarea>
+								</label>
+								<button type="submit">Send</button>
+							</form>
+							<p
+								class="draft-feedback"
+								role="status"
+								data-error="Draft encryption or storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+							></p>
+						</form-saver>
+					</div>
+				</div>
+			</section>
+		</main>
+		<footer>
+			<p>
+				<a href="https://github.com/aarongustafson/form-saver"
+					>form-saver on GitHub</a
+				>
+			</p>
+		</footer>
+		<script src="./feedback.js" type="module"></script>
+		<script src="../define.js" type="module"></script>
+	</body>
+</html>

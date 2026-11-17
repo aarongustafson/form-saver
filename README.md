@@ -22,6 +22,7 @@ It is designed for crash recovery and interrupted sessions:
 
 Additional demos:
 
+- [Encrypted Draft Demo](https://aarongustafson.github.io/form-saver/demo/encrypted.html) ([Source](./demo/encrypted.html), [Storage Module](./demo/draft-storage.js))
 - [ESM CDN Demo](https://aarongustafson.github.io/form-saver/demo/esm.html) ([Source](./demo/esm.html))
 - [Unpkg CDN Demo](https://aarongustafson.github.io/form-saver/demo/unpkg.html) ([Source](./demo/unpkg.html))
 
@@ -143,6 +144,7 @@ You can control placement with `retain-choice-container`, which accepts a CSS se
 | `retain-choice-label`     | `string`  | `"Store my contact information for later"` | Plain-text label for the injected checkbox                                                  |
 | `retain-choice-container` | `string`  | `""`                                       | CSS selector for a container element into which the checkbox is appended                    |
 | `storage-key`             | `string`  | derived                                    | Optional storage key override                                                               |
+| `script`                  | `string`  | none                                       | Application module that initializes async storage transformation hooks                      |
 
 Default derived storage key format:
 
@@ -165,6 +167,80 @@ Calls to `saveFormState()` save immediately. Saves triggered by `input` and
 writing to `localStorage` for every keystroke. Pending changes are flushed when
 the page is hidden.
 
+With `script`, `saveFormState()` and `restoreFormState()` return promises that
+settle after their work completes or an error is reported. Without `script`,
+these methods remain synchronous. New edits, saves, clearing, storage-key
+changes, disconnection, and script changes invalidate stale async work.
+
+## Application-Owned Storage Transformations
+
+Use `script` to transform drafts without putting encryption, authentication, or
+key management inside the component:
+
+```html
+<form-saver script="./draft-storage.js">
+  <form action="/contact" method="post">
+    <!-- Your labelled fields -->
+  </form>
+</form-saver>
+```
+
+The URL resolves against the element's document base URI (including `<base>`),
+not the component module's URL. The module must export a default initializer.
+It is called once per connection for each element, with that element as its
+argument, and may initialize asynchronously. It must return **both** hooks:
+
+```javascript
+// draft-storage.js (application code)
+export default async function (element) {
+  const key = await obtainSessionAuthorizedKey();
+  return {
+    async beforeSave(state) {
+      return encryptDraft(state, key);
+    },
+    async beforeRestore(payload) {
+      return decryptDraft(payload, key);
+    },
+  };
+}
+```
+
+`obtainSessionAuthorizedKey`, `encryptDraft`, and `decryptDraft` are
+application-defined functions, not package APIs. See the runnable
+[AES-GCM module](./demo/draft-storage.js) for an example using a deliberately
+public demo key. Web Crypto requires a secure context (HTTPS or localhost).
+
+- `beforeSave(state)` receives the serialized state, with password and file
+  controls excluded, and returns a JSON-serializable payload.
+- `beforeRestore(payload)` receives the parsed stored payload **before**
+  form-state validation and returns the original state shape:
+  `{ fieldName: [{ type: 'text', value: 'example' }] }`. Checkbox/radio entries
+  also contain `checked`; multiple-select entries contain `values`.
+- Both hooks may return a value or a promise. Restored state is sanitized and
+  password controls are never populated. Sanitized drafts are rewritten
+  through `beforeSave`, never directly as plaintext.
+
+Saves and restoration wait for initialization. If loading, initialization, or
+a hook fails, `form-saver-error` reports it; the component does **not** retry
+with plaintext. Failed restores leave the stored payload and current fields
+untouched. Existing plaintext drafts are not automatically migrated: use a
+new storage key or implement an explicit migration policy in your module.
+Changing `script` reinitializes the component; removing it deliberately returns
+to plaintext storage. Changing `storage-key` invalidates pending work but does
+not automatically restore the new key; call `restoreFormState()` if needed.
+
+The latest operation wins: delayed saves cannot overwrite a newer draft or
+recreate one after `clearSavedData()`. Delayed restoration cannot overwrite
+edits made while the module initializes or decrypts.
+
+**Page lifecycle limitation:** browsers do not wait for promises during
+`pagehide`. Autosave is best-effort; immediate navigation, closing a tab, or a
+crash can lose the latest asynchronous save. When an application controls
+navigation, await `saveFormState()` before leaving. After submission, the full
+draft is removed immediately, and only opted-in retained fields are transformed
+again. That asynchronous retention write may not finish during navigation;
+clearing takes priority over keeping the full draft.
+
 ## Field Support
 
 Supported controls include:
@@ -178,11 +254,19 @@ nor restored, even if their field names appear in `retain`.
 
 ## Privacy and Storage Errors
 
-Saved values are stored as plain text in `localStorage`. Any JavaScript running
+Without `script`, saved values are stored as plain text in `localStorage`. Any JavaScript running
 on the same origin can read them, so avoid wrapping forms that collect other
 sensitive information that should not persist on the device. The component
 automatically removes identifiable password entries written by earlier
 versions when it reads saved state.
+
+Encryption is only as useful as the application's key and session management.
+Do not persist a real encryption key alongside drafts. Authorize key access on
+the server and revoke access on logout or session expiry. Another person can
+still restore drafts if the prior session authorizes the key. Encryption does
+not protect against malicious same-origin JavaScript and is not, on its own,
+a guarantee of GDPR compliance. The existing `retain-choice` checkbox controls
+post-submit retention, **not** permission to save drafts before submission.
 
 If a browser blocks `localStorage`, its quota is exhausted, or another storage
 operation fails, the component dispatches a bubbling, composed
@@ -190,7 +274,7 @@ operation fails, the component dispatches a bubbling, composed
 
 ```javascript
 {
-  operation: 'read' | 'write' | 'remove',
+  operation: 'read' | 'write' | 'remove' | 'initialize' | 'beforeSave' | 'beforeRestore',
   error: Error
 }
 ```

@@ -1,0 +1,314 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { FormSaverElement } from '../form-saver.js';
+
+const script = pathToFileURL(resolve('test/fixtures/storage-hooks.js')).href;
+const state = { message: [{ type: 'text', value: 'saved' }] };
+const deferred = () => {
+	let resolve;
+	const promise = new Promise((done) => {
+		resolve = done;
+	});
+	return { promise, resolve };
+};
+
+describe('storage transformation modules', () => {
+	let element;
+	let errors;
+	let hooks;
+
+	beforeEach(() => {
+		localStorage.clear();
+		hooks = {
+			beforeSave: vi.fn(async (value) => ({ wrapped: value })),
+			beforeRestore: vi.fn(async (payload) => payload.wrapped),
+		};
+		element = document.createElement('form-saver');
+		element.script = script;
+		element.storageKey = 'hooks-test';
+		element.innerHTML = `<form>
+			<input name="message" value="current">
+			<input name="email" value="demo@example.com">
+			<input name="password" type="password" value="secret">
+			<button type="submit">Send</button>
+		</form>`;
+		element.configureStorage = vi.fn(async () => hooks);
+		errors = vi.fn();
+		element.addEventListener('form-saver-error', errors);
+	});
+
+	afterEach(() => {
+		element.remove();
+		localStorage.clear();
+		vi.restoreAllMocks();
+	});
+
+	async function connect() {
+		document.body.append(element);
+		await vi.waitFor(() =>
+			expect(element.configureStorage).toHaveBeenCalledOnce(),
+		);
+	}
+
+	it('awaits per-element initialization, transforms saves and restores before validation', async () => {
+		const init = deferred();
+		element.configureStorage.mockReturnValue(init.promise);
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		await connect();
+		expect(element.querySelector('input').value).toBe('current');
+		expect(hooks.beforeRestore).not.toHaveBeenCalled();
+		init.resolve(hooks);
+		await vi.waitFor(() =>
+			expect(element.querySelector('input').value).toBe('saved'),
+		);
+		await element.saveFormState();
+		const payload = JSON.parse(localStorage.getItem('hooks-test'));
+		expect(payload.wrapped.message).toEqual(state.message);
+		expect(payload.wrapped.password).toBeUndefined();
+		expect(hooks.beforeSave).toHaveBeenCalledOnce();
+	});
+
+	it.each(['beforeSave', 'beforeRestore'])(
+		'reports %s failures without plaintext fallback or deleting the draft',
+		async (operation) => {
+			const error = new Error('Key unavailable');
+			hooks[operation].mockRejectedValue(error);
+			const original = JSON.stringify({ wrapped: state });
+			localStorage.setItem('hooks-test', original);
+			await connect();
+			if (operation === 'beforeSave') await element.saveFormState();
+			await vi.waitFor(() => expect(errors).toHaveBeenCalled());
+			expect(errors.mock.calls[0][0].detail).toEqual({
+				operation,
+				error,
+			});
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+		},
+	);
+
+	it.each(['reject', 'invalid'])(
+		'fails closed when module initialization is %s',
+		async (failure) => {
+			if (failure === 'reject') {
+				element.configureStorage.mockRejectedValue(
+					new Error('Unauthorized'),
+				);
+			} else {
+				element.configureStorage.mockResolvedValue({
+					beforeSave: null,
+				});
+			}
+			await connect();
+			await element.saveFormState();
+			expect(localStorage.getItem('hooks-test')).toBeNull();
+			expect(errors.mock.calls[0][0].detail.operation).toBe('initialize');
+		},
+	);
+
+	it('reports a missing module without persisting form values', async () => {
+		element.script = new URL('./missing.js', script).href;
+		document.body.append(element);
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		await element.saveFormState();
+		expect(errors.mock.calls[0][0].detail.operation).toBe('initialize');
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+	});
+
+	it('waits for initialization before saving edits made during key acquisition', async () => {
+		const init = deferred();
+		element.configureStorage.mockReturnValue(init.promise);
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		await connect();
+		element.querySelector('input').value = 'edited while loading';
+		const pending = element.saveFormState();
+		expect(hooks.beforeSave).not.toHaveBeenCalled();
+		init.resolve(hooks);
+		await pending;
+		expect(hooks.beforeRestore).not.toHaveBeenCalled();
+		expect(
+			JSON.parse(localStorage.getItem('hooks-test')).wrapped.message[0]
+				.value,
+		).toBe('edited while loading');
+	});
+
+	it('does not fall back to plaintext even when an initialization error listener saves', async () => {
+		element.setAttribute('script', ' ');
+		element.addEventListener(
+			'form-saver-error',
+			() => element.saveFormState(),
+			{ once: true },
+		);
+		document.body.append(element);
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		await element.saveFormState();
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+	});
+
+	it('initializes again after reconnecting and discards the old hooks', async () => {
+		await connect();
+		element.remove();
+		element.configureStorage.mockResolvedValue({
+			beforeSave: async () => ({ reconnected: true }),
+			beforeRestore: hooks.beforeRestore,
+		});
+		document.body.append(element);
+		await vi.waitFor(() =>
+			expect(element.configureStorage).toHaveBeenCalledTimes(2),
+		);
+		await element.saveFormState();
+		expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual({
+			reconnected: true,
+		});
+		expect(hooks.beforeSave).not.toHaveBeenCalled();
+	});
+
+	it('passes a JSON null payload to beforeRestore instead of treating it as absent', async () => {
+		hooks.beforeSave.mockResolvedValue(null);
+		hooks.beforeRestore.mockResolvedValue(state);
+		await connect();
+		await element.saveFormState();
+		await element.restoreFormState();
+		expect(hooks.beforeRestore).toHaveBeenCalledWith(null);
+		expect(element.querySelector('input').value).toBe('saved');
+	});
+
+	it.each(['read', 'write'])(
+		'reports %s failures in the transformed storage path',
+		async (operation) => {
+			await connect();
+			const error = new Error('Storage unavailable');
+			vi.spyOn(
+				FormSaverElement,
+				operation === 'read' ? '_readFromStorage' : '_saveToStorage',
+			).mockImplementation(() => {
+				throw error;
+			});
+			if (operation === 'read') await element.restoreFormState();
+			else await element.saveFormState();
+			expect(errors.mock.calls[0][0].detail).toEqual({
+				operation,
+				error,
+			});
+		},
+	);
+
+	it('re-transforms sanitized state rather than writing decrypted values', async () => {
+		localStorage.setItem(
+			'hooks-test',
+			JSON.stringify({
+				wrapped: {
+					...state,
+					password: [{ type: 'password', value: 'legacy' }],
+				},
+			}),
+		);
+		await connect();
+		await vi.waitFor(() => expect(hooks.beforeSave).toHaveBeenCalledOnce());
+		expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual({
+			wrapped: state,
+		});
+		expect(element.querySelector('[name=password]').value).toBe('secret');
+	});
+
+	it('reports invalid restored state and leaves the payload intact', async () => {
+		hooks.beforeRestore.mockResolvedValue('invalid');
+		localStorage.setItem('hooks-test', '{"wrapped":"opaque"}');
+		await connect();
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeRestore');
+		expect(localStorage.getItem('hooks-test')).toBe('{"wrapped":"opaque"}');
+	});
+
+	it('does not restore over edits made while decryption is pending', async () => {
+		const restore = deferred();
+		hooks.beforeRestore.mockReturnValue(restore.promise);
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		await connect();
+		await vi.waitFor(() =>
+			expect(hooks.beforeRestore).toHaveBeenCalledOnce(),
+		);
+		const input = element.querySelector('input');
+		input.value = 'new edit';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		restore.resolve(state);
+		await Promise.resolve();
+		await element.saveFormState();
+		expect(input.value).toBe('new edit');
+	});
+
+	it('never lets an older asynchronous save overwrite a newer one', async () => {
+		await connect();
+		const first = deferred();
+		hooks.beforeSave.mockReturnValueOnce(first.promise);
+		const pending = element.saveFormState();
+		await vi.waitFor(() => expect(hooks.beforeSave).toHaveBeenCalledOnce());
+		element.querySelector('input').value = 'latest';
+		await element.saveFormState();
+		first.resolve({ wrapped: state });
+		await pending;
+		expect(
+			JSON.parse(localStorage.getItem('hooks-test')).wrapped.message[0]
+				.value,
+		).toBe('latest');
+	});
+
+	it.each(['clear', 'disconnect', 'storage-key', 'script', 'submit'])(
+		'invalidates an in-flight save on %s',
+		async (action) => {
+			await connect();
+			const save = deferred();
+			hooks.beforeSave.mockReturnValue(save.promise);
+			const pending = element.saveFormState();
+			await vi.waitFor(() =>
+				expect(hooks.beforeSave).toHaveBeenCalledOnce(),
+			);
+			if (action === 'clear') element.clearSavedData();
+			if (action === 'disconnect') element.remove();
+			if (action === 'storage-key') element.storageKey = 'another-key';
+			if (action === 'script') element.script = '';
+			if (action === 'submit') {
+				element
+					.querySelector('form')
+					.dispatchEvent(new Event('submit', { cancelable: true }));
+				window.dispatchEvent(new Event('pagehide'));
+			}
+			save.resolve({ wrapped: state });
+			await pending;
+			expect(localStorage.getItem('hooks-test')).toBeNull();
+			expect(localStorage.getItem('another-key')).toBeNull();
+		},
+	);
+
+	it('transforms only opted-in retained fields after submit', async () => {
+		element.retain = 'email';
+		element.retainChoice = true;
+		await connect();
+		await element.saveFormState();
+		element.querySelector('[name=form-saver-retain]').checked = true;
+		element
+			.querySelector('form')
+			.dispatchEvent(new Event('submit', { cancelable: true }));
+		window.dispatchEvent(new Event('pagehide'));
+		await vi.waitFor(() =>
+			expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual({
+				wrapped: {
+					email: [{ type: 'text', value: 'demo@example.com' }],
+				},
+			}),
+		);
+	});
+
+	it('removes the full draft even if encrypting retained fields fails', async () => {
+		element.retain = 'email';
+		await connect();
+		await element.saveFormState();
+		hooks.beforeSave.mockRejectedValue(new Error('Encryption unavailable'));
+		element
+			.querySelector('form')
+			.dispatchEvent(new Event('submit', { cancelable: true }));
+		await element._handlePageHide();
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeSave');
+	});
+});
