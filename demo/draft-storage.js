@@ -10,7 +10,7 @@ function isBytes(value) {
 	);
 }
 
-export default async function () {
+export async function initialize(saver, { signal }) {
 	const key = await crypto.subtle.importKey(
 		'raw',
 		demo_key,
@@ -18,42 +18,41 @@ export default async function () {
 		false,
 		['encrypt', 'decrypt'],
 	);
+	if (signal.aborted) return;
 	const encoder = new TextEncoder();
 	const decoder = new TextDecoder();
 
-	return {
-		async beforeSave(state) {
-			const iv = crypto.getRandomValues(new Uint8Array(12));
-			const ciphertext = await crypto.subtle.encrypt(
-				{ name: 'AES-GCM', iv },
-				key,
-				encoder.encode(JSON.stringify(state)),
-			);
-			return {
-				version: 1,
-				algorithm: 'AES-GCM',
-				iv: Array.from(iv),
-				ciphertext: Array.from(new Uint8Array(ciphertext)),
-			};
-		},
+	saver.beforeSave = async (state) => {
+		const iv = crypto.getRandomValues(new Uint8Array(12));
+		const ciphertext = await crypto.subtle.encrypt(
+			{ name: 'AES-GCM', iv },
+			key,
+			encoder.encode(JSON.stringify(state)),
+		);
+		return {
+			version: 1,
+			algorithm: 'AES-GCM',
+			iv: Array.from(iv),
+			ciphertext: Array.from(new Uint8Array(ciphertext)),
+		};
+	};
 
-		async beforeRestore(payload) {
-			if (
-				payload?.version !== 1 ||
-				payload.algorithm !== 'AES-GCM' ||
-				!isBytes(payload.iv) ||
-				payload.iv.length !== 12 ||
-				!isBytes(payload.ciphertext) ||
-				payload.ciphertext.length < 16
-			) {
-				throw new TypeError('Unsupported encrypted draft format.');
-			}
-			const plaintext = await crypto.subtle.decrypt(
-				{ name: 'AES-GCM', iv: new Uint8Array(payload.iv) },
-				key,
-				new Uint8Array(payload.ciphertext),
-			);
-			return JSON.parse(decoder.decode(plaintext));
-		},
+	saver.beforeRestore = async (payload) => {
+		if (
+			payload?.version !== 1 ||
+			payload.algorithm !== 'AES-GCM' ||
+			!isBytes(payload.iv) ||
+			payload.iv.length !== 12 ||
+			!isBytes(payload.ciphertext) ||
+			payload.ciphertext.length < 16
+		) {
+			throw new TypeError('Unsupported encrypted draft format.');
+		}
+		const plaintext = await crypto.subtle.decrypt(
+			{ name: 'AES-GCM', iv: new Uint8Array(payload.iv) },
+			key,
+			new Uint8Array(payload.ciphertext),
+		);
+		return JSON.parse(decoder.decode(plaintext));
 	};
 }

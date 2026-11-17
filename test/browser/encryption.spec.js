@@ -66,3 +66,20 @@ test('keeps form usable and saves nothing when the module cannot load', async ({
 		await page.evaluate((key) => localStorage.getItem(key), key),
 	).toBeNull();
 });
+
+test('reports malformed JSON without discarding the encrypted draft', async ({
+	page,
+}) => {
+	await page.goto('/demo/encrypted.html');
+	const corrupted = '{"ciphertext":';
+	await page.evaluate(
+		({ key, corrupted }) => localStorage.setItem(key, corrupted),
+		{ key, corrupted },
+	);
+	await page.reload();
+	await expect(page.getByRole('status')).toContainText('Keep a copy');
+	expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
+		corrupted,
+	);
+	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('');
+});

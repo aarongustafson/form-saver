@@ -22,6 +22,7 @@ It is designed for crash recovery and interrupted sessions:
 
 Additional demos:
 
+- [Behavior Module Demo](https://aarongustafson.github.io/form-saver/demo/behavior.html) ([Source](./demo/behavior.html), [Module](./demo/writing-help.js)): writing help without storage hooks.
 - [Encrypted Draft Demo](https://aarongustafson.github.io/form-saver/demo/encrypted.html) ([Source](./demo/encrypted.html), [Storage Module](./demo/draft-storage.js))
 - [ESM CDN Demo](https://aarongustafson.github.io/form-saver/demo/esm.html) ([Source](./demo/esm.html))
 - [Unpkg CDN Demo](https://aarongustafson.github.io/form-saver/demo/unpkg.html) ([Source](./demo/unpkg.html))
@@ -144,7 +145,7 @@ You can control placement with `retain-choice-container`, which accepts a CSS se
 | `retain-choice-label`     | `string`  | `"Store my contact information for later"` | Plain-text label for the injected checkbox                                                  |
 | `retain-choice-container` | `string`  | `""`                                       | CSS selector for a container element into which the checkbox is appended                    |
 | `storage-key`             | `string`  | derived                                    | Optional storage key override                                                               |
-| `script`                  | `string`  | none                                       | Application module that initializes async storage transformation hooks                      |
+| `script`                  | `string`  | none                                       | Application behavior module; storage hooks are optional                                     |
 
 Default derived storage key format:
 
@@ -156,52 +157,81 @@ Where `method` and `action` come from the wrapped form.
 
 ## Methods
 
-| Method               | Description                                   |
-| -------------------- | --------------------------------------------- |
-| `saveFormState()`    | Serializes and persists current form values   |
-| `restoreFormState()` | Applies saved values to current fields        |
-| `clearSavedData()`   | Removes saved values for the current form key |
+| Method               | Description                                                          |
+| -------------------- | -------------------------------------------------------------------- |
+| `saveFormState()`    | Serializes and persists current form values                          |
+| `restoreFormState()` | Applies saved values to current fields                               |
+| `clearSavedData()`   | Removes saved values for the current form key                        |
+| `loadModule(url)`    | Imports a resolved behavior module URL; override for a custom loader |
 
 Calls to `saveFormState()` save immediately. Saves triggered by `input` and
 `change` events use a short debounce to avoid serializing the complete form and
 writing to `localStorage` for every keystroke. Pending changes are flushed when
 the page is hidden.
 
-With `script`, `saveFormState()` and `restoreFormState()` return promises that
-settle after their work completes or an error is reported. Without `script`,
-these methods remain synchronous. New edits, saves, clearing, storage-key
+With `script` or either storage hook configured, `saveFormState()` and
+`restoreFormState()` return promises that settle after their work completes
+or an error is reported. With neither scripts nor hooks, these methods remain
+synchronous. New edits, saves, clearing, storage-key
 changes, disconnection, and script changes invalidate stale async work.
+Replacing a storage callback also invalidates pending work, except while the
+current behavior initializer is still configuring the element.
 
-## Application-Owned Storage Transformations
+## Behavior Modules
 
-Use `script` to transform drafts without putting encryption, authentication, or
-key management inside the component:
+Use `script` to connect application behavior to the form. It can configure
+storage hooks, add event listeners, or connect other UI without changing how
+drafts are stored:
 
 ```html
-<form-saver script="./draft-storage.js">
+<form-saver script="./writing-help.js">
   <form action="/contact" method="post">
     <!-- Your labelled fields -->
   </form>
 </form-saver>
 ```
 
-The URL resolves against the element's document base URI (including `<base>`),
-not the component module's URL. The module must export a default initializer.
-It is called once per connection for each element, with that element as its
-argument, and may initialize asynchronously. It must return **both** hooks:
+The URL resolves against the element’s document base URI (including `<base>`),
+not the component module’s URL. Only HTTP and HTTPS module URLs are accepted.
+Use trusted modules: they execute with your page’s JavaScript privileges.
+The component calls `loadModule(url)` to import the resolved URL.
+
+A module may export `initialize(element, { signal })`. If present, this must be
+a function. It runs once per connection for each element and may be async.
+It can return a synchronous cleanup function or nothing—not a hooks object.
+A module without an initializer is also supported.
+
+The [writing-help demo](./demo/behavior.html) uses this pattern without either
+storage hook. The component waits for initialization before restoring or saving
+drafts, even when the script only adds behavior.
+
+On disconnection or a `script` change, the component invalidates pending work,
+aborts `signal`, clears the storage callbacks, and calls cleanup. Cleanup errors
+are reported with operation `cleanup`. If an async initializer returns cleanup
+after it was superseded, that cleanup runs immediately. Use the signal for
+listeners and requests, and check `signal.aborted` after awaits before installing
+callbacks or changing UI. The component cannot cancel a module import or undo
+arbitrary application side effects.
+
+## Optional Storage Hooks
+
+`beforeSave` and `beforeRestore` are nullable callback properties, not DOM events
+or HTML attributes. Set either, both, or neither; an absent callback leaves its
+step unchanged. Each callback runs with the element as `this`. You can configure
+them directly in JavaScript without a `script` module, too. They are cleared on
+disconnect or script reinitialization, so reconnecting integrations must install
+them again. Assigning a non-function other than `null` or `undefined` throws a
+`TypeError`; `undefined` resets the property to `null`.
+
+For example, an encryption integration could configure both hooks:
 
 ```javascript
 // draft-storage.js (application code)
-export default async function (element) {
-  const key = await obtainSessionAuthorizedKey();
-  return {
-    async beforeSave(state) {
-      return encryptDraft(state, key);
-    },
-    async beforeRestore(payload) {
-      return decryptDraft(payload, key);
-    },
-  };
+export async function initialize(element, { signal }) {
+  const key = await obtainSessionAuthorizedKey({ signal });
+  if (signal.aborted) return;
+  element.beforeSave = (state) => encryptDraft(state, key);
+  element.beforeRestore = (payload) => decryptDraft(payload, key);
 }
 ```
 
@@ -216,14 +246,20 @@ public demo key. Web Crypto requires a secure context (HTTPS or localhost).
   form-state validation and returns the original state shape:
   `{ fieldName: [{ type: 'text', value: 'example' }] }`. Checkbox/radio entries
   also contain `checked`; multiple-select entries contain `values`.
-- Both hooks may return a value or a promise. Restored state is sanitized and
-  password controls are never populated. Sanitized drafts are rewritten
-  through `beforeSave`, never directly as plaintext.
+- Both hooks may return a value or a promise. Invalid hook results report an
+  error rather than falling back to untransformed data. Restore results must
+  contain arrays of control objects, with string `type` and `value` properties,
+  boolean `checked` for checkboxes/radios, or a string array `values` instead of
+  `value` for multiple selects. Password entries are removed after validation,
+  and password controls are never populated. Sanitized drafts pass through
+  `beforeSave` again if it is configured.
 
 Saves and restoration wait for initialization. If loading, initialization, or
 a hook fails, `form-saver-error` reports it; the component does **not** retry
 with plaintext. Failed restores leave the stored payload and current fields
-untouched. Existing plaintext drafts are not automatically migrated: use a
+untouched. Malformed stored JSON also reports a `read` error when a script or
+hook is configured, without removing the stored payload. Existing plaintext
+drafts are not automatically migrated: use a
 new storage key or implement an explicit migration policy in your module.
 Changing `script` reinitializes the component; removing it deliberately returns
 to plaintext storage. Changing `storage-key` invalidates pending work but does
@@ -236,9 +272,9 @@ edits made while the module initializes or decrypts.
 **Page lifecycle limitation:** browsers do not wait for promises during
 `pagehide`. Autosave is best-effort; immediate navigation, closing a tab, or a
 crash can lose the latest asynchronous save. When an application controls
-navigation, await `saveFormState()` before leaving. After submission, the full
-draft is removed immediately, and only opted-in retained fields are transformed
-again. That asynchronous retention write may not finish during navigation;
+navigation, await `saveFormState()` before leaving. During `pagehide` following
+submission, the full draft is removed before any opted-in retained fields are
+transformed again. That asynchronous retention write may not finish during navigation;
 clearing takes priority over keeping the full draft.
 
 ## Field Support
@@ -254,7 +290,8 @@ nor restored, even if their field names appear in `retain`.
 
 ## Privacy and Storage Errors
 
-Without `script`, saved values are stored as plain text in `localStorage`. Any JavaScript running
+Without an encryption transformation, saved values are stored as plain text in
+`localStorage`, including when `script` only adds other behavior. Any JavaScript running
 on the same origin can read them, so avoid wrapping forms that collect other
 sensitive information that should not persist on the device. The component
 automatically removes identifiable password entries written by earlier
@@ -274,7 +311,7 @@ operation fails, the component dispatches a bubbling, composed
 
 ```javascript
 {
-  operation: 'read' | 'write' | 'remove' | 'initialize' | 'beforeSave' | 'beforeRestore',
+  operation: 'read' | 'write' | 'remove' | 'initialize' | 'cleanup' | 'beforeSave' | 'beforeRestore',
   error: Error
 }
 ```

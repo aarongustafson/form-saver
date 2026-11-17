@@ -3,7 +3,8 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { FormSaverElement } from '../form-saver.js';
 
-const script = pathToFileURL(resolve('test/fixtures/storage-hooks.js')).href;
+const fixture = pathToFileURL(resolve('test/fixtures/storage-hooks.js')).href;
+const script = 'https://example.test/storage-hooks.js';
 const state = { message: [{ type: 'text', value: 'saved' }] };
 const deferred = () => {
 	let resolve;
@@ -33,7 +34,13 @@ describe('storage transformation modules', () => {
 			<input name="password" type="password" value="secret">
 			<button type="submit">Send</button>
 		</form>`;
-		element.configureStorage = vi.fn(async () => hooks);
+		vi.spyOn(element, 'loadModule').mockImplementation(
+			() => import(fixture),
+		);
+		element.configureStorage = vi.fn(() => {
+			element.beforeSave = hooks.beforeSave;
+			element.beforeRestore = hooks.beforeRestore;
+		});
 		errors = vi.fn();
 		element.addEventListener('form-saver-error', errors);
 	});
@@ -53,7 +60,11 @@ describe('storage transformation modules', () => {
 
 	it('awaits per-element initialization, transforms saves and restores before validation', async () => {
 		const init = deferred();
-		element.configureStorage.mockReturnValue(init.promise);
+		element.configureStorage.mockImplementation(async () => {
+			await init.promise;
+			element.beforeSave = hooks.beforeSave;
+			element.beforeRestore = hooks.beforeRestore;
+		});
 		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
 		await connect();
 		expect(element.querySelector('input').value).toBe('current');
@@ -107,7 +118,7 @@ describe('storage transformation modules', () => {
 	);
 
 	it('reports a missing module without persisting form values', async () => {
-		element.script = new URL('./missing.js', script).href;
+		element.loadModule.mockRejectedValue(new Error('Module unavailable'));
 		document.body.append(element);
 		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
 		await element.saveFormState();
@@ -117,7 +128,11 @@ describe('storage transformation modules', () => {
 
 	it('waits for initialization before saving edits made during key acquisition', async () => {
 		const init = deferred();
-		element.configureStorage.mockReturnValue(init.promise);
+		element.configureStorage.mockImplementation(async () => {
+			await init.promise;
+			element.beforeSave = hooks.beforeSave;
+			element.beforeRestore = hooks.beforeRestore;
+		});
 		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
 		await connect();
 		element.querySelector('input').value = 'edited while loading';
@@ -148,9 +163,9 @@ describe('storage transformation modules', () => {
 	it('initializes again after reconnecting and discards the old hooks', async () => {
 		await connect();
 		element.remove();
-		element.configureStorage.mockResolvedValue({
-			beforeSave: async () => ({ reconnected: true }),
-			beforeRestore: hooks.beforeRestore,
+		element.configureStorage.mockImplementation(() => {
+			element.beforeSave = async () => ({ reconnected: true });
+			element.beforeRestore = hooks.beforeRestore;
 		});
 		document.body.append(element);
 		await vi.waitFor(() =>
@@ -220,6 +235,163 @@ describe('storage transformation modules', () => {
 		expect(localStorage.getItem('hooks-test')).toBe('{"wrapped":"opaque"}');
 	});
 
+	it.each([
+		{ message: 'not an array' },
+		{ message: [null] },
+		{ message: [{ type: 'text', value: 42 }] },
+		{ message: [{ type: 'checkbox', checked: 'false', value: 'yes' }] },
+		{ message: [{ type: 'select-multiple', values: [42] }] },
+		{ message: Array(1) },
+	])(
+		'preserves the whole draft when a restore hook returns invalid state: %j',
+		async (invalid) => {
+			const original = JSON.stringify({ wrapped: state });
+			localStorage.setItem('hooks-test', original);
+			hooks.beforeRestore.mockResolvedValue(invalid);
+			await connect();
+			await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+			expect(errors.mock.calls[0][0].detail.operation).toBe(
+				'beforeRestore',
+			);
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+			expect(element.querySelector('input').value).toBe('current');
+		},
+	);
+
+	it('reports malformed JSON without calling the restore hook or removing the draft', async () => {
+		const original = '{"wrapped":';
+		localStorage.setItem('hooks-test', original);
+		await connect();
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		expect(errors.mock.calls[0][0].detail.operation).toBe('read');
+		expect(hooks.beforeRestore).not.toHaveBeenCalled();
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+	});
+
+	it.each(['neither', 'beforeSave', 'beforeRestore'])(
+		'allows an initializer to configure %s storage hooks',
+		async (selected) => {
+			element.configureStorage.mockImplementation(() => {
+				if (selected === 'beforeSave')
+					element.beforeSave = hooks.beforeSave;
+				if (selected === 'beforeRestore')
+					element.beforeRestore = hooks.beforeRestore;
+			});
+			const original =
+				selected === 'beforeRestore' ? { wrapped: state } : state;
+			localStorage.setItem('hooks-test', JSON.stringify(original));
+			await connect();
+			await vi.waitFor(() =>
+				expect(element.querySelector('input').value).toBe('saved'),
+			);
+			await element.saveFormState();
+			const saved = JSON.parse(localStorage.getItem('hooks-test'));
+			expect(
+				selected === 'beforeSave'
+					? saved.wrapped.message
+					: saved.message,
+			).toEqual(state.message);
+			expect(errors).not.toHaveBeenCalled();
+		},
+	);
+
+	it('accepts a behavior module without an initializer', async () => {
+		element.loadModule.mockResolvedValue({});
+		document.body.append(element);
+		await vi.waitFor(() =>
+			expect(element.loadModule).toHaveBeenCalledOnce(),
+		);
+		await element.saveFormState();
+		expect(
+			JSON.parse(localStorage.getItem('hooks-test')).message[0].value,
+		).toBe('current');
+		expect(errors).not.toHaveBeenCalled();
+	});
+
+	it.each(['disconnect', 'script'])(
+		'aborts module listeners and runs cleanup on %s',
+		async (action) => {
+			const listener = vi.fn();
+			const cleanup = vi.fn();
+			let signal;
+			element.configureStorage.mockImplementation((saver, context) => {
+				signal = context.signal;
+				document.addEventListener('storage-review', listener, {
+					signal,
+				});
+				saver.beforeSave = hooks.beforeSave;
+				return cleanup;
+			});
+			await connect();
+			await element.saveFormState();
+			if (action === 'disconnect') element.remove();
+			else element.script = null;
+			document.dispatchEvent(new Event('storage-review'));
+			expect(signal.aborted).toBe(true);
+			expect(listener).not.toHaveBeenCalled();
+			expect(cleanup).toHaveBeenCalledOnce();
+			expect(element.beforeSave).toBeNull();
+			expect(element.beforeRestore).toBeNull();
+		},
+	);
+
+	it('disposes late initialization results without reactivating a disconnected module', async () => {
+		const pending = deferred();
+		const cleanup = vi.fn();
+		let signal;
+		element.configureStorage.mockImplementation((saver, context) => {
+			signal = context.signal;
+			return pending.promise;
+		});
+		await connect();
+		element.remove();
+		pending.resolve(cleanup);
+		await vi.waitFor(() => expect(cleanup).toHaveBeenCalledOnce());
+		expect(signal.aborted).toBe(true);
+		expect(errors).not.toHaveBeenCalled();
+	});
+
+	it('reports cleanup failures and still clears module hooks', async () => {
+		element.configureStorage.mockImplementation(() => {
+			element.beforeSave = hooks.beforeSave;
+			return () => {
+				throw new Error('Cleanup failed');
+			};
+		});
+		await connect();
+		await element.saveFormState();
+		element.remove();
+		expect(errors.mock.calls[0][0].detail.operation).toBe('cleanup');
+		expect(element.beforeSave).toBeNull();
+	});
+
+	it.each(['', 'data:text/javascript,export{}', 'javascript:void(0)'])(
+		'rejects unsupported script URLs: %s',
+		async (url) => {
+			element.setAttribute('script', url);
+			document.body.append(element);
+			await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+			await element.saveFormState();
+			expect(element.loadModule).not.toHaveBeenCalled();
+			expect(localStorage.getItem('hooks-test')).toBeNull();
+		},
+	);
+
+	it('supports optional hooks configured directly without a script', async () => {
+		element.script = null;
+		element.beforeSave = hooks.beforeSave;
+		element.beforeRestore = hooks.beforeRestore;
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		document.body.append(element);
+		await vi.waitFor(() =>
+			expect(element.querySelector('input').value).toBe('saved'),
+		);
+		await element.saveFormState();
+		expect(
+			JSON.parse(localStorage.getItem('hooks-test')).wrapped.message,
+		).toEqual(state.message);
+	});
+
 	it('does not restore over edits made while decryption is pending', async () => {
 		const restore = deferred();
 		hooks.beforeRestore.mockReturnValue(restore.promise);
@@ -251,6 +423,28 @@ describe('storage transformation modules', () => {
 			JSON.parse(localStorage.getItem('hooks-test')).wrapped.message[0]
 				.value,
 		).toBe('latest');
+	});
+
+	it('invalidates an in-flight save when its callback is replaced', async () => {
+		await connect();
+		const first = deferred();
+		hooks.beforeSave.mockReturnValueOnce(first.promise);
+		const pending = element.saveFormState();
+		await vi.waitFor(() => expect(hooks.beforeSave).toHaveBeenCalledOnce());
+		element.beforeSave = null;
+		first.resolve({ wrapped: state });
+		await pending;
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+	});
+
+	it('rejects invalid hook assignments without replacing an existing callback', () => {
+		element.beforeSave = hooks.beforeSave;
+		expect(() => {
+			element.beforeSave = 'not a function';
+		}).toThrow(TypeError);
+		expect(element.beforeSave).toBe(hooks.beforeSave);
+		element.beforeSave = undefined;
+		expect(element.beforeSave).toBeNull();
 	});
 
 	it.each(['clear', 'disconnect', 'storage-key', 'script', 'submit'])(

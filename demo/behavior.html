@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Behavior modules - &lt;form-saver&gt;</title>
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body>
+		<header>
+			<h1>&lt;form-saver&gt; behavior modules</h1>
+			<p>
+				<a
+					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
+					>README</a
+				>
+				· <a href="./index.html">All examples</a>
+			</p>
+		</header>
+		<main>
+			<section class="demo-section">
+				<h2>Connect behavior without storage hooks</h2>
+				<p>
+					The <code>script</code> attribute loads an application
+					behavior module. Its optional
+					<code>initialize(element, { signal })</code>
+					export can connect any form behavior; it doesn’t have to
+					configure
+					<code>beforeSave</code> or <code>beforeRestore</code>.
+				</p>
+				<p>
+					This
+					<a href="./writing-help.js">writing-help module</a> adds a
+					button to show or hide authored writing tips. It uses an
+					abort signal for its listener and returns a cleanup function
+					to restore the original presentation when the component
+					disconnects. Labels and help text come from the HTML.
+				</p>
+				<p>
+					Use invented details. Drafts are still saved as plaintext in
+					this browser’s localStorage; this module does not encrypt
+					them. Without JavaScript, the writing tips stay visible and
+					the native form remains usable, but drafts aren’t saved. If
+					the behavior module fails, the tips remain available and
+					persistence is blocked. Keep a copy before leaving. The
+					<code>/contact</code> endpoint is a placeholder, not a
+					submission service.
+				</p>
+				<div class="code-demo-pair">
+					<pre tabindex="0"><code><mark>&lt;form-saver
+  script="./writing-help.js"
+  storage-key="demo:behavior"
+&gt;</mark>
+  &lt;form action="/contact" method="post"&gt;
+    &lt;label for="message"&gt;Message&lt;/label&gt;
+    &lt;textarea id="message" name="message"&gt;&lt;/textarea&gt;
+    &lt;button type="button" hidden
+      data-toggle-help aria-controls="writing-tips"
+      aria-expanded="true"
+      data-show-label="Show writing tips"
+      data-hide-label="Hide writing tips"&gt;
+      Hide writing tips
+    &lt;/button&gt;
+    &lt;p id="writing-tips"&gt;
+      Describe what you tried and what you expected.
+      Don’t include passwords or other sensitive details.
+    &lt;/p&gt;
+    &lt;button type="submit"&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
+<mark>&lt;/form-saver&gt;</mark>
+
+// writing-help.js (excerpt)
+<mark>export function initialize(saver, { signal }) {</mark>
+  const button = saver.querySelector('[data-toggle-help]');
+  // The full module also sets labels and restores the
+  // authored presentation in its cleanup function.
+  button.addEventListener('click', toggleHelp, { signal });
+<mark>}</mark></code></pre>
+					<div class="demo">
+						<form-saver
+							script="./writing-help.js"
+							storage-key="demo:behavior"
+						>
+							<form action="/contact" method="post">
+								<label for="message">Message</label>
+								<textarea
+									id="message"
+									name="message"
+								></textarea>
+								<button
+									type="button"
+									hidden
+									data-toggle-help
+									aria-controls="writing-tips"
+									aria-expanded="true"
+									data-show-label="Show writing tips"
+									data-hide-label="Hide writing tips"
+								>
+									Hide writing tips
+								</button>
+								<p id="writing-tips">
+									Describe what you tried and what you
+									expected. Don’t include passwords or other
+									sensitive details.
+								</p>
+								<button type="submit">Send</button>
+							</form>
+							<p
+								class="draft-feedback"
+								role="status"
+								data-error="Draft storage or the behavior module is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+							></p>
+						</form-saver>
+					</div>
+				</div>
+			</section>
+		</main>
+		<footer>
+			<p>
+				Made with ❤️ by
+				<a href="https://github.com/aarongustafson">Aaron Gustafson</a>.
+				View the source on
+				<a href="https://github.com/aarongustafson/form-saver">GitHub</a
+				>.
+			</p>
+		</footer>
+		<script src="./feedback.js" type="module"></script>
+		<script src="../define.js" type="module"></script>
+	</body>
+</html>

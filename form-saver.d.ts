@@ -8,8 +8,8 @@
  * @attr {string} retain-choice-label - Label text for the injected retention checkbox.
  * @attr {string} retain-choice-container - Optional selector for a container element into which the retention checkbox is placed.
  * @attr {string} storage-key - Optional explicit storage key override.
- * @attr {string} script - Module URL whose default initializer returns storage transformation hooks.
- * @fires form-saver-error - Fired when storage, module initialization, or a transformation fails.
+ * @attr {string} script - Behavior module URL with an optional initialize(element, { signal }) export.
+ * @fires form-saver-error - Fired when storage, module initialization, cleanup, or a transformation fails.
  */
 export interface FormSaverErrorDetail {
 	operation:
@@ -17,17 +17,35 @@ export interface FormSaverErrorDetail {
 		| 'write'
 		| 'remove'
 		| 'initialize'
+		| 'cleanup'
 		| 'beforeSave'
 		| 'beforeRestore';
 	error: unknown;
 }
 
-export type FormSaverControlState = {
-	type: string;
-	value?: string;
-	checked?: boolean;
-	values?: string[];
-};
+export type FormSaverControlState =
+	| { type: 'checkbox' | 'radio'; value: string; checked: boolean }
+	| { type: 'select-multiple'; values: string[] }
+	| {
+			type:
+				| 'value'
+				| 'color'
+				| 'date'
+				| 'datetime-local'
+				| 'email'
+				| 'hidden'
+				| 'month'
+				| 'number'
+				| 'password'
+				| 'range'
+				| 'search'
+				| 'tel'
+				| 'text'
+				| 'time'
+				| 'url'
+				| 'week';
+			value: string;
+	  };
 
 export type FormSaverState = Record<string, FormSaverControlState[]>;
 export type FormSaverPayload =
@@ -38,18 +56,22 @@ export type FormSaverPayload =
 	| FormSaverPayload[]
 	| { [key: string]: FormSaverPayload };
 
-export interface FormSaverStorageHooks {
-	beforeSave(
-		state: FormSaverState,
-	): FormSaverPayload | Promise<FormSaverPayload>;
-	beforeRestore(
-		payload: FormSaverPayload,
-	): FormSaverState | Promise<FormSaverState>;
-}
-
-export type FormSaverStorageInitializer = (
+export type FormSaverBeforeSave = (
+	this: FormSaverElement,
+	state: FormSaverState,
+) => FormSaverPayload | Promise<FormSaverPayload>;
+export type FormSaverBeforeRestore = (
+	this: FormSaverElement,
+	payload: FormSaverPayload,
+) => FormSaverState | Promise<FormSaverState>;
+export type FormSaverInitializer = (
 	element: FormSaverElement,
-) => FormSaverStorageHooks | Promise<FormSaverStorageHooks>;
+	context: { signal: AbortSignal },
+) => void | (() => void) | Promise<void | (() => void)>;
+
+export interface FormSaverBehaviorModule {
+	initialize?: FormSaverInitializer;
+}
 
 export class FormSaverElement extends HTMLElement {
 	/**
@@ -105,7 +127,26 @@ export class FormSaverElement extends HTMLElement {
 	set script(value: string | null | undefined);
 
 	/**
-	 * Saves current form state, asynchronously when a script is configured.
+	 * Optional save transformation. Null leaves collected state unchanged.
+	 * Cleared on disconnect or script reinitialization.
+	 */
+	get beforeSave(): FormSaverBeforeSave | null;
+	set beforeSave(value: FormSaverBeforeSave | null | undefined);
+
+	/**
+	 * Optional restore transformation. Null uses parsed storage unchanged.
+	 * Cleared on disconnect or script reinitialization.
+	 */
+	get beforeRestore(): FormSaverBeforeRestore | null;
+	set beforeRestore(value: FormSaverBeforeRestore | null | undefined);
+
+	/**
+	 * Imports the resolved behavior module URL. Override for custom loaders.
+	 */
+	loadModule(url: string): Promise<FormSaverBehaviorModule>;
+
+	/**
+	 * Saves current form state, asynchronously when a script or hook is configured.
 	 */
 	saveFormState(): void | Promise<void>;
 

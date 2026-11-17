@@ -1,3 +1,3 @@
-export default async function (element) {
-	return element.configureStorage();
+export function initialize(element, context) {
+	return element.configureStorage(element, context);
 }

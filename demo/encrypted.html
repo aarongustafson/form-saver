@@ -8,12 +8,26 @@
 	</head>
 	<body>
 		<header>
-			<h1>Encrypted drafts</h1>
-			<p><a href="./index.html">All form-saver examples</a></p>
+			<h1>&lt;form-saver&gt; encrypted drafts</h1>
+			<p>
+				<a
+					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
+					>README</a
+				>
+				· <a href="./index.html">All examples</a>
+			</p>
 		</header>
 		<main>
-			<section>
+			<section class="demo-section">
 				<h2>Application-owned storage transformations</h2>
+				<p>
+					The module’s
+					<code>initialize(saver, { signal })</code> export configures
+					the optional <code>beforeSave</code> and
+					<code>beforeRestore</code> callbacks. For a script that
+					doesn’t configure storage hooks, see the
+					<a href="./behavior.html">writing-help example</a>.
+				</p>
 				<p>
 					Use invented details only. This example uses a
 					<strong>public, predictable demo key</strong>, so anyone can
@@ -96,9 +110,11 @@
 		</main>
 		<footer>
 			<p>
-				<a href="https://github.com/aarongustafson/form-saver"
-					>form-saver on GitHub</a
-				>
+				Made with ❤️ by
+				<a href="https://github.com/aarongustafson">Aaron Gustafson</a>.
+				View the source on
+				<a href="https://github.com/aarongustafson/form-saver">GitHub</a
+				>.
 			</p>
 		</footer>
 		<script src="./feedback.js" type="module"></script>
