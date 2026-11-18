@@ -1,6 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+	await page.route(
+		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/**',
+		(route) => route.abort(),
+	);
+});
+
 const read = (file) =>
 	readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
 const css = await read('demo/styles.css');
@@ -271,7 +278,7 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		await demo(page, file);
 		const saver = page.locator('form-saver').first();
 		const name = saver.locator('input[name="name"]');
-		await page.locator('header a').focus();
+		await page.locator('.code-demo-pair pre').first().focus();
 		await page.keyboard.press('Tab');
 		// Scrollable code samples may be native tab stops before the live form.
 		for (
@@ -403,7 +410,9 @@ test('storage read denial has visible recovery without hiding the native form', 
 		};
 	});
 	await demo(page);
-	for (const feedback of await page.locator('[role="status"]').all()) {
+	for (const feedback of await page
+		.locator('form-saver [role="status"]')
+		.all()) {
 		await expect(feedback).toContainText('storage is unavailable');
 	}
 	await page.locator('input[name="name"]').first().fill('Safe in form');
@@ -605,9 +614,9 @@ test('forced-color emulation keeps automatic adjustment and non-color state feed
 			.evaluate((element) => getComputedStyle(element).forcedColorAdjust),
 	).toBe('auto');
 	await page.locator('form-saver').first().dispatchEvent('form-saver-error');
-	await expect(page.locator('[role="status"]').first()).toContainText(
-		'storage is unavailable',
-	);
+	await expect(
+		page.locator('form-saver [role="status"]').first(),
+	).toContainText('storage is unavailable');
 });
 
 test('preview is no-cache and does not expose repository metadata', async ({

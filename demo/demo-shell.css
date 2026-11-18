@@ -1,0 +1,350 @@
+:root {
+	color-scheme: light dark;
+	--accent: light-dark(#075e58, #8ee3d1);
+	--rule: color-mix(in srgb, CanvasText 22%, Canvas);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: system-ui, sans-serif;
+	line-height: 1.6;
+	color: var(--page-color, CanvasText);
+	background: var(--page-background, Canvas);
+	max-width: none;
+	max-inline-size: 1440px;
+	margin: 0 auto;
+	padding: clamp(1rem, 3vw, 3rem);
+	overflow-wrap: anywhere;
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image:
+		linear-gradient(var(--rule) 1px, transparent 1px),
+		linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+	background-size: 4rem 4rem;
+	opacity: 0.18;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.skip-link {
+	position: absolute;
+	inset-block-start: 0.5rem;
+	inset-inline-start: 1rem;
+	transform: translateY(-200%);
+	padding: 0.75rem 1rem;
+	background: Canvas;
+	color: LinkText;
+	border: 2px solid currentColor;
+	z-index: 10;
+}
+.skip-link:focus {
+	transform: none;
+}
+:focus-visible {
+	outline: 3px solid CanvasText;
+	outline-offset: 4px;
+}
+
+h1 {
+	font-family: system-monospace, monospace;
+	font-size: clamp(2rem, 5vw, 4.5rem);
+	line-height: 1.15;
+	margin-block: 1rem 1.5rem;
+}
+h2 {
+	border: 0;
+	padding: 0;
+	font-size: clamp(1.5rem, 2.5vw, 2rem);
+	letter-spacing: -0.025em;
+	line-height: 1.25;
+	margin-block: 0 1rem;
+}
+h3 {
+	font-size: 1.25rem;
+	margin-block: 1rem 0.5rem;
+}
+p {
+	margin-block: 0.5rem;
+}
+a,
+a:active {
+	color: LinkText;
+	text-decoration-skip-ink: auto;
+}
+a:visited {
+	color: VisitedText;
+}
+body > header {
+	margin-block-end: 0;
+	padding-block: 2rem 3rem;
+	border-block-end: 2px solid var(--rule);
+	background: Canvas;
+}
+.eyebrow {
+	font:
+		700 0.8rem / 1.5 system-monospace,
+		monospace;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--accent);
+	border-inline-start: 3px solid currentColor;
+	padding-inline-start: 0.75rem;
+}
+.lede {
+	font-size: clamp(1.25rem, 2.3vw, 1.75rem);
+	line-height: 1.4;
+	max-inline-size: 38ch;
+}
+.header-description {
+	max-inline-size: 65ch;
+	margin-block: 1rem 1.5rem;
+}
+body > header nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.25rem;
+}
+body > header nav a {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	text-underline-offset: 0.2em;
+	font-weight: 650;
+}
+.intro {
+	background: Canvas;
+	padding-block: 2.5rem 1rem;
+	max-inline-size: 80ch;
+}
+.code-help,
+.enhancement-status {
+	font-size: 0.9rem;
+	max-inline-size: 80ch;
+}
+details {
+	margin-block-start: 1rem;
+}
+summary {
+	min-block-size: 2.75rem;
+	padding-block: 0.5rem;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+.enhancement-status {
+	border-inline-start: 3px solid currentColor;
+	padding-inline-start: 1rem;
+}
+body > footer {
+	margin-block-start: 4rem;
+	padding-block-start: 2rem;
+	border-block-start: 1px solid CanvasText;
+	background: Canvas;
+	color: CanvasText;
+	color: color-mix(in srgb, CanvasText 80%, Canvas);
+	font-size: 0.9rem;
+}
+
+.demo-section,
+.api-reference {
+	margin-trim: block;
+	margin-block: 2.5rem;
+	padding: 2.5rem 0 0;
+	border: 0;
+	border-radius: 0;
+	background: Canvas;
+	color: CanvasText;
+	border-block-start: 1px solid var(--rule);
+}
+.demo-section > p,
+.api-reference > p {
+	max-inline-size: 80ch;
+}
+
+.code-demo-pair {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1.25rem;
+	margin-block: 1.5rem;
+	align-items: start;
+}
+.code-demo-pair > * {
+	min-inline-size: 0;
+}
+@media (min-width: 768px) {
+	.code-demo-pair {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+pre,
+code,
+kbd,
+samp {
+	font-family: system-monospace, monospace;
+	font-size: 0.9em;
+}
+pre,
+.event-log {
+	background-color: Canvas;
+	background-image: linear-gradient(Field, Field);
+	color: FieldText;
+	padding: 1rem;
+	border-radius: 0.375rem;
+	margin: 0;
+}
+pre {
+	overflow: auto;
+	line-height: 1.4;
+	font-size: 0.875rem;
+}
+pre code {
+	background: none;
+	padding: 0;
+	color: inherit;
+	font-size: inherit;
+}
+.demo {
+	background: Canvas;
+	color: CanvasText;
+	padding: 1rem;
+	border: 1px solid var(--rule);
+	border-radius: 0.75rem;
+}
+.demo::before {
+	content: 'Live example';
+	display: block;
+	grid-column: 1 / -1;
+	font:
+		700 0.75rem / 1.5 system-monospace,
+		monospace;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	margin-block-end: 1rem;
+}
+
+micro-lighter {
+	display: grid;
+	min-inline-size: 0;
+	max-inline-size: 100%;
+}
+.code-panel {
+	border: 1px solid var(--rule);
+	border-radius: 0.75rem;
+	overflow: clip;
+	background: var(--syntax-background, Canvas);
+	color: var(--syntax-foreground, CanvasText);
+}
+.code-panel:focus-within {
+	outline: 3px solid CanvasText;
+	outline-offset: 4px;
+}
+micro-lighter::before {
+	content: attr(data-label);
+	grid-column: 1 / -1;
+	grid-row: 1;
+	align-self: start;
+	justify-self: start;
+	z-index: 2;
+	margin: 1rem;
+	max-inline-size: calc(100% - 7rem);
+	font:
+		700 0.7rem / 1.5 system-monospace,
+		monospace;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+micro-lighter pre {
+	border: 0;
+	background: var(--syntax-background, Canvas);
+	background-image: none;
+	color: var(--syntax-foreground, CanvasText);
+	padding-block-start: 4.5rem;
+	line-height: 1.5;
+	min-inline-size: 0;
+	max-inline-size: 100%;
+	border-radius: 0;
+}
+micro-lighter::part(copy-button) {
+	min-inline-size: 2.75rem;
+	min-block-size: 2.75rem;
+	margin: 0.75rem;
+	font:
+		600 0.8rem / 1.4 system-ui,
+		sans-serif;
+	border-color: var(--syntax-foreground, CanvasText);
+}
+micro-lighter::part(line-numbers) {
+	color: var(--syntax-foreground, CanvasText);
+}
+
+h1 code {
+	background: none;
+	color: inherit;
+	padding: 0;
+	font: inherit;
+}
+
+.demo-section > :focus-visible,
+.demo-section > p :focus-visible {
+	outline-color: CanvasText;
+}
+
+@media (max-width: 600px) {
+	body {
+		padding: 1rem;
+	}
+	.demo,
+	pre {
+		padding: 0.5rem;
+	}
+	micro-lighter::before {
+		content: none;
+	}
+	micro-lighter pre {
+		padding-block-start: 4.5rem;
+	}
+}
+
+@media (forced-colors: active), (prefers-contrast: more) {
+	pre,
+	.event-log {
+		background-color: Field;
+		background-image: none;
+		color: FieldText;
+	}
+	body::before {
+		display: none;
+	}
+	.eyebrow,
+	body > footer {
+		color: CanvasText;
+	}
+}
+
+@media print {
+	body::before,
+	.skip-link,
+	.code-help,
+	.enhancement-status {
+		display: none;
+	}
+	.code-demo-pair {
+		display: block;
+	}
+	pre {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+}

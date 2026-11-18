@@ -28,7 +28,7 @@ test('encrypts drafts with fresh IVs and restores them across reloads', async ({
 	expect(next.iv).not.toEqual(payload.iv);
 	await page.reload();
 	await expect(name).toHaveValue('Invented Person');
-	await expect(page.getByRole('status')).toBeEmpty();
+	await expect(page.locator('form-saver').getByRole('status')).toBeEmpty();
 });
 
 test('reports tampering instead of restoring or replacing the encrypted draft', async ({
@@ -47,7 +47,9 @@ test('reports tampering instead of restoring or replacing the encrypted draft', 
 		return value;
 	}, key);
 	await page.reload();
-	await expect(page.getByRole('status')).toContainText('Keep a copy');
+	await expect(page.locator('form-saver').getByRole('status')).toContainText(
+		'Keep a copy',
+	);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('');
 	expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
 		corrupted,
@@ -59,7 +61,9 @@ test('keeps form usable and saves nothing when the module cannot load', async ({
 }) => {
 	await page.route('**/draft-storage.js', (route) => route.abort());
 	await page.goto('/demo/encrypted.html');
-	await expect(page.getByRole('status')).toContainText('Keep a copy');
+	await expect(page.locator('form-saver').getByRole('status')).toContainText(
+		'Keep a copy',
+	);
 	await page.getByLabel('Name', { exact: true }).fill('Invented Person');
 	await page.waitForTimeout(300);
 	expect(
@@ -77,7 +81,9 @@ test('reports malformed JSON without discarding the encrypted draft', async ({
 		{ key, corrupted },
 	);
 	await page.reload();
-	await expect(page.getByRole('status')).toContainText('Keep a copy');
+	await expect(page.locator('form-saver').getByRole('status')).toContainText(
+		'Keep a copy',
+	);
 	expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
 		corrupted,
 	);

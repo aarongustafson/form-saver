@@ -4,12 +4,19 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>&lt;form-saver&gt; Web Component Demo</title>
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/themes/github.css"
+		/>
 		<link rel="stylesheet" href="./styles.css" />
+		<link rel="stylesheet" href="./demo-shell.css" />
 	</head>
-	<body>
+	<body data-syntax-theme="github">
+		<a class="skip-link" href="#main">Skip to examples</a>
 		<header>
+			<p class="eyebrow">Web component / Examples</p>
 			<h1>&lt;form-saver&gt;</h1>
-			<p>
+			<p class="lede">
 				A web component that stores (and restores) values within the
 				form it wraps. See the
 				<a
@@ -18,9 +25,27 @@
 				>
 				for installation and API documentation.
 			</p>
+			<nav aria-label="Component resources">
+				<a
+					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
+					>Read the README</a
+				>
+				<a href="https://github.com/aarongustafson/form-saver"
+					>View on GitHub</a
+				>
+				<a href="./esm.html">esm.sh example</a>
+				<a href="./unpkg.html">unpkg example</a>
+			</nav>
 		</header>
 
-		<main>
+		<main id="main" tabindex="-1">
+			<p
+				id="microlighter-status"
+				class="enhancement-status"
+				role="status"
+				hidden
+			></p>
+
 			<p>
 				Explore the
 				<a href="./behavior.html">behavior-only demo</a> for scripts
@@ -56,7 +81,16 @@
 						restored.
 					</p>
 					<div class="code-demo-pair">
-						<pre tabindex="0"><code><mark>&lt;form-saver&gt;</mark>
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Basic Usage code 1"
+								tabindex="0"
+							><code><mark>&lt;form-saver&gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
       Name
@@ -73,6 +107,7 @@
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
 						<div class="demo">
 							<form-saver storage-key="demo:basic">
 								<form action="/contact" method="post">
@@ -129,9 +164,16 @@
 						blank.
 					</p>
 					<div class="code-demo-pair">
-						<pre
-							tabindex="0"
-						><code><mark>&lt;form-saver retain="name email"&gt;</mark>
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Using the retain attribute code 2"
+								tabindex="0"
+							><code><mark>&lt;form-saver retain="name email"&gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
       Name
@@ -148,6 +190,7 @@
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
 						<div class="demo">
 							<form-saver
 								retain="name email"
@@ -210,7 +253,16 @@
 						<em>"Store my contact information for later"</em>.
 					</p>
 					<div class="code-demo-pair">
-						<pre tabindex="0"><code><mark>&lt;form-saver
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Simple opt-in: retain-choice code 3"
+								tabindex="0"
+							><code><mark>&lt;form-saver
   retain="name email"
   retain-choice
 &gt;</mark>
@@ -230,6 +282,7 @@
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
 						<div class="demo">
 							<form-saver
 								retain="name email"
@@ -279,7 +332,16 @@
 						voice.
 					</p>
 					<div class="code-demo-pair">
-						<pre tabindex="0"><code><mark>&lt;form-saver
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Custom label: retain-choice-label code 4"
+								tabindex="0"
+							><code><mark>&lt;form-saver
   retain="name email"
   retain-choice
   retain-choice-label="Remember my details next time"
@@ -289,6 +351,7 @@
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
 						<div class="demo">
 							<form-saver
 								retain="name email"
@@ -344,7 +407,16 @@
 						element.
 					</p>
 					<div class="code-demo-pair">
-						<pre tabindex="0"><code><mark>&lt;form-saver
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Custom placement: retain-choice-container code 5"
+								tabindex="0"
+							><code><mark>&lt;form-saver
   retain="name email"
   retain-choice
   retain-choice-label="Remember my details next time"
@@ -368,6 +440,7 @@
     &lt;/div&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
 						<div class="demo">
 							<form-saver
 								retain="name email"
@@ -437,5 +510,6 @@
 
 		<script src="./feedback.js" type="module"></script>
 		<script src="../define.js" type="module"></script>
+		<script type="module" src="./code-examples.js"></script>
 	</body>
 </html>
