@@ -10,7 +10,9 @@ test.beforeEach(async ({ page }) => {
 
 const read = (file) =>
 	readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
-const css = await read('demo/styles.css');
+const css = (
+	await Promise.all(['demo/styles.css', 'demo/demo-shell.css'].map(read))
+).join('\n');
 const source = await read('form-saver.js');
 const definition = await read('define.js');
 const tokens = [
