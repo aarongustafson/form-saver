@@ -201,7 +201,7 @@ export class FormSaverElement extends HTMLElement {
 					Object.getPrototypeOf(value),
 				)) ||
 			Object.getOwnPropertySymbols(value).length > 0 ||
-			'toJSON' in value
+			typeof value.toJSON === 'function'
 		) {
 			throw new TypeError(
 				'The saved payload must contain only JSON values.',
@@ -659,12 +659,13 @@ export class FormSaverElement extends HTMLElement {
 		this._cancelPendingSave();
 		this._internals.revision++;
 		this._internals.connection++;
-		this._internals.behaviorReady = null;
+		this._internals.behaviorReady = Promise.resolve(false);
 		this._cancelBehavior();
 		this._startBehavior();
 	}
 
 	_startBehavior() {
+		this._internals.behaviorReady = null;
 		if (this.hasAttribute('script')) {
 			const script = this.script;
 			const connection = this._internals.connection;
@@ -864,7 +865,7 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	_handlePageHide() {
-		if (this._usesAsyncStorage && this._internals.pendingSubmit) {
+		if (this._internals.pendingSubmit && this._internals.storageKey) {
 			this._internals.pendingSubmit = false;
 			// Remove the full draft before starting asynchronous retention work.
 			this.clearSavedData();
@@ -877,44 +878,19 @@ export class FormSaverElement extends HTMLElement {
 					Object.entries(state).filter(([name]) => fields.has(name)),
 				);
 				if (Object.keys(retained).length > 0) {
-					return this._saveTransformedState(
-						retained,
-						this._internals.revision,
-					);
+					if (this._usesAsyncStorage) {
+						return this._saveTransformedState(
+							retained,
+							this._internals.revision,
+						);
+					}
+					this._writeSavedState(retained);
 				}
 			}
 			return;
 		}
 
 		this._flushPendingSave();
-
-		if (!this._internals.pendingSubmit || !this._internals.storageKey) {
-			return;
-		}
-
-		const retained_fields = this._retainedFieldNames;
-		if (retained_fields.size > 0 && this._shouldRetainAfterSubmit()) {
-			const saved_state = this._readSavedState();
-			if (saved_state) {
-				const filtered_state = Object.fromEntries(
-					Object.entries(saved_state).filter(([field_name]) =>
-						retained_fields.has(field_name),
-					),
-				);
-
-				if (Object.keys(filtered_state).length > 0) {
-					this._writeSavedState(filtered_state);
-				} else {
-					this._removeSavedState();
-				}
-			} else {
-				this._removeSavedState();
-			}
-		} else {
-			this._removeSavedState();
-		}
-
-		this._internals.pendingSubmit = false;
 	}
 
 	_scheduleSave() {
@@ -949,6 +925,8 @@ export class FormSaverElement extends HTMLElement {
 			const stored_state = FormSaverElement._readFromStorage(
 				this._internals.storageKey,
 			);
+			if (stored_state === null) return null;
+			FormSaverElement._validateRestoredState(stored_state);
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(stored_state);
 

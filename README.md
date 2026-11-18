@@ -219,6 +219,9 @@ after it was superseded, that cleanup runs immediately. Use the signal for
 listeners and requests, and check `signal.aborted` after awaits before installing
 callbacks or changing UI. The component cannot cancel a module import or undo
 arbitrary application side effects.
+Save and restore requests made synchronously by the old module’s abort listeners
+or cleanup are blocked during replacement; they do not run without the old
+callbacks or carry over into the new module.
 Changing `script` restarts only the behavior module. It preserves live fields,
 the retention checkbox, and pending submission cleanup, and does not restore
 stored values again. Call `restoreFormState()` explicitly if that is intended.
@@ -230,7 +233,9 @@ or HTML attributes. Set either, both, or neither; an absent callback leaves its
 step unchanged. Each callback runs with the element as `this`. You can configure
 them directly in JavaScript without a `script` module, too. They are cleared on
 disconnect or script reinitialization, so reconnecting integrations must install
-them again. Assigning a non-function other than `null` or `undefined` throws a
+them again. If a reconnected element cannot decode its saved payload, it reports
+a read error and preserves the payload. Install the callbacks and explicitly
+call `restoreFormState()` to retry. Assigning a non-function other than `null` or `undefined` throws a
 `TypeError`; `undefined` resets the property to `null`.
 
 For example, an encryption integration could configure both hooks:
@@ -301,6 +306,10 @@ navigation, await `saveFormState()` before leaving. During `pagehide` following
 submission, the full draft is removed before any opted-in retained fields are
 transformed again. That asynchronous retention write may not finish during navigation;
 clearing takes priority over keeping the full draft.
+Post-submit retention always uses the selected live fields, not the previously
+stored envelope. If the application deliberately removes the encryption module
+or callbacks before navigation, retained fields use the configuration then in
+effect, including plaintext storage when no save transformation remains.
 
 ## Field Support
 

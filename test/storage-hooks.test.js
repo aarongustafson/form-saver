@@ -677,4 +677,100 @@ describe('storage transformation modules', () => {
 		expect(localStorage.getItem('hooks-test')).toBeNull();
 		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeSave');
 	});
+
+	it.each(['abort', 'cleanup'])(
+		'blocks saves made by old module %s during replacement',
+		async (phase) => {
+			let teardownSave;
+			element.configureStorage.mockImplementation((saver, { signal }) => {
+				saver.beforeSave = hooks.beforeSave;
+				saver.beforeRestore = hooks.beforeRestore;
+				const save = () => {
+					teardownSave = saver.saveFormState();
+				};
+				if (phase === 'abort')
+					signal.addEventListener('abort', save, { once: true });
+				return phase === 'cleanup' ? save : undefined;
+			});
+			await connect();
+			await element.saveFormState();
+			const original = localStorage.getItem('hooks-test');
+			element.configureStorage.mockImplementation(() => {});
+			element.script = '/new.js';
+			await teardownSave;
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+		},
+	);
+
+	it('allows a native field named toJSON without hooks', async () => {
+		element.script = null;
+		element.querySelector('input').name = 'toJSON';
+		document.body.append(element);
+		await Promise.resolve();
+		element.saveFormState();
+		expect(JSON.parse(localStorage.getItem('hooks-test')).toJSON).toEqual([
+			{ type: 'text', value: 'current' },
+		]);
+		expect(errors).not.toHaveBeenCalled();
+	});
+
+	it('rejects a callable serializer without invoking it or replacing the draft', async () => {
+		await connect();
+		await element.saveFormState();
+		const original = localStorage.getItem('hooks-test');
+		const serializer = vi.fn(() => 'unexpected');
+		hooks.beforeSave.mockResolvedValue({ toJSON: serializer });
+		await element.saveFormState();
+		expect(serializer).not.toHaveBeenCalled();
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+		expect(errors).toHaveBeenCalledOnce();
+	});
+
+	it('preserves direct-hook payloads through reconnect until the decoder is reinstalled', async () => {
+		element.script = null;
+		element.beforeSave = hooks.beforeSave;
+		element.beforeRestore = hooks.beforeRestore;
+		document.body.append(element);
+		await Promise.resolve();
+		await element.saveFormState();
+		const original = localStorage.getItem('hooks-test');
+		element.remove();
+		document.body.append(element);
+		await Promise.resolve();
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+		expect(errors.mock.calls[0][0].detail.operation).toBe('read');
+		element.beforeRestore = hooks.beforeRestore;
+		await element.restoreFormState();
+		expect(element.querySelector('input').value).toBe('current');
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+	});
+
+	it.each(['script', 'hooks'])(
+		'retains live selected fields when %s are removed after submit',
+		async (source) => {
+			element.retain = 'email';
+			element.retainChoice = true;
+			if (source === 'hooks') {
+				element.script = null;
+				element.beforeSave = hooks.beforeSave;
+				element.beforeRestore = hooks.beforeRestore;
+				document.body.append(element);
+				await Promise.resolve();
+			} else await connect();
+			await element.saveFormState();
+			element.querySelector('[name=form-saver-retain]').checked = true;
+			element
+				.querySelector('form')
+				.dispatchEvent(new Event('submit', { cancelable: true }));
+			if (source === 'script') element.script = null;
+			else {
+				element.beforeSave = null;
+				element.beforeRestore = null;
+			}
+			await element._handlePageHide();
+			expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual({
+				email: [{ type: 'text', value: 'demo@example.com' }],
+			});
+		},
+	);
 });

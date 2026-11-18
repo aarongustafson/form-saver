@@ -124,3 +124,25 @@ test('reset followed by clearing cannot recreate an encrypted draft', async ({
 		await page.evaluate((key) => localStorage.getItem(key), key),
 	).toBeNull();
 });
+
+test('submission retention uses live fields after encryption is deliberately removed', async ({
+	page,
+}) => {
+	await page.goto('/demo/encrypted.html');
+	await page.getByLabel('Name', { exact: true }).fill('Retained example');
+	await page.getByRole('checkbox').check();
+	await page.locator('form-saver').evaluate(async (saver) => {
+		await saver.saveFormState();
+		const form = saver.querySelector('form');
+		form.dispatchEvent(new Event('submit', { cancelable: true }));
+		saver.script = null;
+		window.dispatchEvent(new Event('pagehide'));
+	});
+	const stored = await page.evaluate(
+		(key) => JSON.parse(localStorage.getItem(key)),
+		key,
+	);
+	expect(stored.name).toEqual([{ type: 'text', value: 'Retained example' }]);
+	expect(stored.message).toBeUndefined();
+	expect(stored.ciphertext).toBeUndefined();
+});
