@@ -1,4 +1,4 @@
-body[data-syntax-theme] {
+[data-syntax-theme] {
 	color-scheme: inherit;
 }
 
@@ -329,7 +329,7 @@ h1 code {
 }
 
 @media (forced-colors: active), (prefers-contrast: more) {
-	body[data-syntax-theme] {
+	[data-syntax-theme] {
 		--syntax-background: Field;
 		--syntax-foreground: FieldText;
 		--syntax-comment: FieldText;

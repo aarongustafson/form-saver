@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 const root = new URL('../../', import.meta.url);
@@ -10,6 +10,7 @@ async function serveDemo(
 	{
 		grammarFailure = false,
 		stalledTheme = false,
+		themeFailure = false,
 		distinctFields = false,
 	} = {},
 ) {
@@ -28,10 +29,13 @@ async function serveDemo(
 		let file;
 		if (url.href.startsWith(cdn)) {
 			if (stalledTheme && url.pathname.endsWith('.css')) return;
+			if (themeFailure && url.pathname.endsWith('.css'))
+				return route.abort();
 			if (grammarFailure && url.pathname.endsWith('/grammars/html.js'))
 				return route.abort();
 			if (url.pathname.endsWith('/micro-lighter-element.min.js')) {
 				await page.locator('micro-lighter').evaluateAll((panels) => {
+					panels[0].setAttribute('data-syntax-theme', 'github');
 					for (const panel of panels)
 						panel.dataset.authoredSnippet =
 							panel.querySelector('code').textContent;
@@ -83,51 +87,66 @@ async function serveDemo(
 					html: 'text/html',
 					js: 'text/javascript',
 					css: 'text/css',
+					json: 'application/json',
 					svg: 'image/svg+xml',
 				}[extension] ?? 'application/octet-stream',
 		});
 	});
 }
 
-test('pinned highlighting preserves text and keyboard Copy includes the complete snippet', async ({
-	page,
-	browserName,
-}) => {
-	await serveDemo(page);
-	await page.setViewportSize({ width: 1600, height: 1000 });
-	await page.goto('http://code-demo.test/demo/index.html');
-	await expect(page.locator('#microlighter-status')).toBeHidden();
-	const panels = page.locator('micro-lighter');
-	const examples = [panels.first()];
-	const tabbed = page.locator('tabbed-interface').first();
-	if (await tabbed.count()) {
-		await expect(tabbed).toHaveAttribute('data-layout', 'tabs');
-		await tabbed
-			.getByRole('tab', { name: 'Installation', exact: true })
-			.focus();
-		await page.keyboard.press('Enter');
-		examples.push(
-			tabbed.locator('micro-lighter[language="javascript"]').first(),
-		);
-	}
-	for (const panel of examples) {
+const examples = [];
+for (const file of (await readdir(new URL('demo/', root)))
+	.filter((file) => file.endsWith('.html'))
+	.sort()) {
+	const html = await readFile(new URL(`demo/${file}`, root), 'utf8');
+	const languages = new Set(
+		[...html.matchAll(/<micro-lighter\b[^>]*\blanguage="([^"]+)"/g)].map(
+			(match) => match[1],
+		),
+	);
+	for (const language of languages) examples.push({ file, language });
+}
+
+for (const { file, language } of examples) {
+	test(`${file}: ${language} highlighting preserves text and keyboard Copy includes the complete snippet`, async ({
+		page,
+		browserName,
+	}) => {
+		await serveDemo(page);
+		await page.setViewportSize({ width: 1600, height: 1000 });
+		await page.goto(`http://code-demo.test/demo/${file}`);
+		await expect(page.locator('#microlighter-status')).toBeHidden();
+		const panel = page
+			.locator(`micro-lighter[language="${language}"]`)
+			.first();
+		if (!(await panel.isVisible())) {
+			const installation = page.getByRole('tab', {
+				name: 'Installation',
+				exact: true,
+			});
+			await installation.focus();
+			await page.keyboard.press('Enter');
+		}
+		await expect(panel).toBeVisible();
 		const code = panel.locator('pre > code');
 		const original = await panel.getAttribute('data-authored-snippet');
 		expect(original).not.toBeNull();
 		await expect
-			.poll(() =>
-				code.evaluate((element) => {
-					return (
-						element.childNodes.length === 1 &&
+			.poll(() => code.evaluate((element) => element.childNodes.length))
+			.toBe(1);
+		if (language !== 'bash') {
+			await expect
+				.poll(() =>
+					code.evaluate((element) =>
 						[...CSS.highlights.values()].some((highlight) =>
 							[...highlight].some((range) =>
 								element.contains(range.startContainer),
 							),
-						)
-					);
-				}),
-			)
-			.toBe(true);
+						),
+					),
+				)
+				.toBe(true);
+		}
 		const button = panel.getByRole('button', { name: 'Copy', exact: true });
 		await code.locator('..').focus();
 		await page.keyboard.press(
@@ -141,7 +160,23 @@ test('pinned highlighting preserves text and keyboard Copy includes the complete
 			.poll(() => page.evaluate(() => window.copiedSnippet))
 			.toBe(original);
 		await expect(code).toHaveText(original, { useInnerText: false });
-	}
+	});
+}
+
+test('a failed optional theme reports only the missing theme while enhancement remains available', async ({
+	page,
+}) => {
+	await serveDemo(page, { themeFailure: true });
+	await page.goto('http://code-demo.test/demo/index.html');
+	await expect(page.locator('#microlighter-status')).toContainText(
+		'Code highlighting and Copy controls are available, but the syntax theme could not load.',
+	);
+	await expect(
+		page
+			.locator('micro-lighter')
+			.first()
+			.getByRole('button', { name: 'Copy', exact: true }),
+	).toBeVisible();
 });
 
 test('a failed grammar retains authored marks and reports the partial failure', async ({
@@ -196,8 +231,11 @@ test('loaded syntax styles respect distinct high-contrast field surfaces and inh
 	const code = page.locator('micro-lighter pre').first();
 	await expect(code).toHaveCSS('background-color', 'rgb(20, 30, 40)');
 	await expect(code).toHaveCSS('color', 'rgb(255, 255, 0)');
+	await expect(code).toHaveCSS('--syntax-keyword', 'rgb(255, 255, 0)');
 	await page.addStyleTag({ content: ':root { color-scheme: light; }' });
-	await expect(page.locator('body')).toHaveCSS('color-scheme', 'light');
+	for (const scope of await page.locator('[data-syntax-theme]').all()) {
+		await expect(scope).toHaveCSS('color-scheme', 'light');
+	}
 });
 
 test('all heading levels use the shared monospace alias', async ({ page }) => {

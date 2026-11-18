@@ -61,6 +61,14 @@ it('keeps code readable while progressively enhancing every full demo page', asy
 			expect(lighter.getAttribute('language'), file).toMatch(
 				/^(html|javascript|css|json|bash)$/,
 			);
+			if (/^\s*[\w$]+\.addEventListener\(/.test(code.textContent)) {
+				expect(lighter.getAttribute('language'), file).toBe(
+					'javascript',
+				);
+				expect(lighter.getAttribute('data-label'), file).toBe(
+					'JavaScript',
+				);
+			}
 			expect(lighter.getAttribute('controls'), file).toBe('copy');
 			expect(pre.getAttribute('tabindex'), file).toBe('0');
 			expect(pre.getAttribute('aria-label'), file).toBeTruthy();
@@ -165,16 +173,35 @@ it('retains authored marks and reports an unavailable entry module', async () =>
 	expect(document.querySelector('#microlighter-status').hidden).toBe(false);
 });
 
-it('reports optional theme failure without blocking successful enhancement', async () => {
-	authoredSnippet();
-	vi.spyOn(console, 'error').mockImplementation(() => {});
-	await import('../demo/code-examples.js');
-	optionalTheme.dispatchEvent(new Event('error'));
-	expect(document.querySelector('#microlighter-status').hidden).toBe(false);
-	expect(
-		document.querySelector('#microlighter-status').textContent,
-	).toContain('Code remains readable and selectable');
-});
+it.each(['before', 'after'])(
+	'reports a theme-only failure %s successful enhancement without claiming the controls failed',
+	async (timing) => {
+		const code = authoredSnippet();
+		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+		if (timing === 'before') {
+			vi.doMock(
+				'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/micro-lighter-element.min.js',
+				() => {
+					optionalTheme.dispatchEvent(new Event('error'));
+					return {};
+				},
+			);
+		}
+		await import('../demo/code-examples.js');
+		if (timing === 'after') optionalTheme.dispatchEvent(new Event('error'));
+		const status = document.querySelector('#microlighter-status');
+		expect(status.hidden).toBe(false);
+		expect(status.textContent).toContain(
+			'Code highlighting and Copy controls are available',
+		);
+		expect(status.textContent).toContain('syntax theme could not load');
+		expect(code.childNodes).toHaveLength(1);
+		expect(log).toHaveBeenCalledWith(
+			'MicroLighter theme could not load:',
+			expect.any(Error),
+		);
+	},
+);
 
 it('does not make the optional CDN stylesheet render-blocking', async () => {
 	for (const file of await readdir('demo', { recursive: true })) {

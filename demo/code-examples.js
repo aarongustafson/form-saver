@@ -15,6 +15,12 @@ try {
 	}
 
 	let themeFailed = false;
+	let enhanced = false;
+	function reportThemeFailure() {
+		status.hidden = false;
+		status.textContent =
+			'Code highlighting and Copy controls are available, but the syntax theme could not load. The component loads independently.';
+	}
 	const theme = document.createElement('link');
 	theme.rel = 'stylesheet';
 	theme.href =
@@ -32,7 +38,11 @@ try {
 		'error',
 		() => {
 			themeFailed = true;
-			reportFailure(new Error('Optional syntax theme unavailable.'));
+			console.error(
+				'MicroLighter theme could not load:',
+				new Error('Optional syntax theme unavailable.'),
+			);
+			if (enhanced) reportThemeFailure();
 		},
 		{ once: true },
 	);
@@ -73,7 +83,10 @@ try {
 		const code = panel.querySelector(':scope > pre > code');
 		if (code?.children.length) code.textContent = code.textContent;
 	}
-	if (!themeFailed) {
+	enhanced = true;
+	if (themeFailed) {
+		reportThemeFailure();
+	} else {
 		status.textContent = '';
 		status.hidden = true;
 	}
