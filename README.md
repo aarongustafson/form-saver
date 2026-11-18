@@ -306,6 +306,8 @@ navigation, await `saveFormState()` before leaving. During `pagehide` following
 submission, the full draft is removed before any opted-in retained fields are
 transformed again. That asynchronous retention write may not finish during navigation;
 clearing takes priority over keeping the full draft.
+Calling `clearSavedData()` explicitly also cancels pending post-submit retention,
+so navigating away cannot recreate that cleared draft from retained fields.
 Post-submit retention always uses the selected live fields, not the previously
 stored envelope. If the application deliberately removes the encryption module
 or callbacks before navigation, retained fields use the configuration then in
@@ -328,8 +330,11 @@ Without an encryption transformation, saved values are stored as plain text in
 `localStorage`, including when `script` only adds other behavior. Any JavaScript running
 on the same origin can read them, so avoid wrapping forms that collect other
 sensitive information that should not persist on the device. The component
-automatically removes identifiable password entries written by earlier
-versions when it reads saved state.
+defensively removes identifiable password entries from recognizable native
+stored drafts, including drafts with null or malformed array entries. This
+cleanup concerns existing storage, not newly collected password inputs.
+Incompatible application payloads are preserved rather than treated as native
+drafts; application restore hooks remain responsible for decoding their format.
 
 Encryption is only as useful as the application's key and session management.
 Do not persist a real encryption key alongside drafts. Authorize key access on

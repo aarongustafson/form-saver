@@ -678,6 +678,26 @@ describe('storage transformation modules', () => {
 		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeSave');
 	});
 
+	it.each(['script', 'plain'])(
+		'explicit clear cancels post-submit retention with %s storage',
+		async (mode) => {
+			element.retain = 'email';
+			if (mode === 'script') await connect();
+			else {
+				element.script = null;
+				document.body.append(element);
+				await Promise.resolve();
+			}
+			await element.saveFormState();
+			element
+				.querySelector('form')
+				.dispatchEvent(new Event('submit', { cancelable: true }));
+			element.clearSavedData();
+			await element._handlePageHide();
+			expect(localStorage.getItem('hooks-test')).toBeNull();
+		},
+	);
+
 	it.each(['abort', 'cleanup'])(
 		'blocks saves made by old module %s during replacement',
 		async (phase) => {

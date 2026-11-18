@@ -586,6 +586,7 @@ export class FormSaverElement extends HTMLElement {
 	clearSavedData() {
 		this._cancelPendingSave();
 		this._internals.revision++;
+		this._internals.pendingSubmit = false;
 		if (!this._internals.storageKey) {
 			return;
 		}
@@ -926,9 +927,27 @@ export class FormSaverElement extends HTMLElement {
 				this._internals.storageKey,
 			);
 			if (stored_state === null) return null;
-			FormSaverElement._validateRestoredState(stored_state);
+			const nativeDraft =
+				typeof stored_state === 'object' &&
+				!Array.isArray(stored_state) &&
+				Object.values(stored_state).every(
+					(value) => value === null || Array.isArray(value),
+				) &&
+				Object.values(stored_state).some(
+					(value) =>
+						Array.isArray(value) &&
+						value.some(
+							(control) =>
+								control &&
+								typeof control === 'object' &&
+								typeof control.type === 'string',
+						),
+				);
+			if (!nativeDraft)
+				FormSaverElement._validateRestoredState(stored_state);
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(stored_state);
+			if (state) FormSaverElement._validateRestoredState(state);
 
 			if (changed) {
 				if (state) {
