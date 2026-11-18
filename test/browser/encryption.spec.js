@@ -83,3 +83,44 @@ test('reports malformed JSON without discarding the encrypted draft', async ({
 	);
 	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('');
 });
+
+test('removing the behavior preserves live edits, retention choice, and ciphertext', async ({
+	page,
+}) => {
+	await page.goto('/demo/encrypted.html');
+	await page.getByLabel('Name', { exact: true }).fill('Saved example');
+	await page.locator('form-saver').evaluate((saver) => saver.saveFormState());
+	const original = await page.evaluate(
+		(key) => localStorage.getItem(key),
+		key,
+	);
+	await page.locator('form-saver').evaluate((saver) => {
+		saver.querySelector('[name=name]').value = 'Unsaved example';
+		saver.querySelector('[name=form-saver-retain]').checked = true;
+		saver.script = null;
+	});
+	await expect(page.getByLabel('Name', { exact: true })).toHaveValue(
+		'Unsaved example',
+	);
+	await expect(page.getByRole('checkbox')).toBeChecked();
+	expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
+		original,
+	);
+});
+
+test('reset followed by clearing cannot recreate an encrypted draft', async ({
+	page,
+}) => {
+	await page.goto('/demo/encrypted.html');
+	await page.getByLabel('Name', { exact: true }).fill('Saved example');
+	await page.locator('form-saver').evaluate((saver) => saver.saveFormState());
+	await page.locator('form-saver').evaluate((saver) => {
+		saver.querySelector('form').reset();
+		saver.clearSavedData();
+	});
+	await page.waitForTimeout(300);
+	await expect(page.getByLabel('Name', { exact: true })).toHaveValue('');
+	expect(
+		await page.evaluate((key) => localStorage.getItem(key), key),
+	).toBeNull();
+});

@@ -46,6 +46,7 @@ describe('storage transformation modules', () => {
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		element.remove();
 		localStorage.clear();
 		vi.restoreAllMocks();
@@ -445,6 +446,177 @@ describe('storage transformation modules', () => {
 		expect(element.beforeSave).toBe(hooks.beforeSave);
 		element.beforeSave = undefined;
 		expect(element.beforeSave).toBeNull();
+	});
+
+	it.each(['beforeSave', 'beforeRestore', 'storage-key'])(
+		'cancels a queued autosave when %s changes',
+		async (change) => {
+			await connect();
+			vi.useFakeTimers();
+			localStorage.setItem('another-key', 'existing draft');
+			element
+				.querySelector('input')
+				.dispatchEvent(new Event('input', { bubbles: true }));
+			if (change === 'storage-key') element.storageKey = 'another-key';
+			else element[change] = null;
+			await vi.advanceTimersByTimeAsync(200);
+			expect(localStorage.getItem('hooks-test')).toBeNull();
+			expect(localStorage.getItem('another-key')).toBe('existing draft');
+		},
+	);
+
+	it('lets an explicit restore supersede an older queued autosave', async () => {
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		await connect();
+		vi.useFakeTimers();
+		const restore = deferred();
+		hooks.beforeRestore.mockReturnValue(restore.promise);
+		element.querySelector('input').value = 'unsaved edit';
+		element
+			.querySelector('input')
+			.dispatchEvent(new Event('input', { bubbles: true }));
+		const pending = element.restoreFormState();
+		await vi.advanceTimersByTimeAsync(200);
+		restore.resolve(state);
+		await pending;
+		expect(element.querySelector('input').value).toBe('saved');
+		expect(hooks.beforeSave).not.toHaveBeenCalled();
+	});
+
+	it('does not recreate a cleared draft from a queued reset save', async () => {
+		await connect();
+		element.querySelector('form').reset();
+		element.clearSavedData();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+		expect(hooks.beforeSave).not.toHaveBeenCalled();
+	});
+
+	it('invalidates a pending restore synchronously on reset', async () => {
+		localStorage.setItem('hooks-test', JSON.stringify({ wrapped: state }));
+		await connect();
+		const restore = deferred();
+		hooks.beforeRestore.mockReturnValue(restore.promise);
+		const pending = element.restoreFormState();
+		await Promise.resolve();
+		await Promise.resolve();
+		restore.resolve(state);
+		element.querySelector('form').reset();
+		await pending;
+		expect(element.querySelector('input').value).toBe('current');
+	});
+
+	it.each(['replace', 'remove'])(
+		'preserves live fields and retention choice on script %s',
+		async (action) => {
+			element.retain = 'email';
+			element.retainChoice = true;
+			localStorage.setItem(
+				'hooks-test',
+				JSON.stringify({ wrapped: state }),
+			);
+			await connect();
+			const input = element.querySelector('input');
+			input.value = 'live edit';
+			const checkbox = element.querySelector('[name=form-saver-retain]');
+			checkbox.checked = true;
+			const original = localStorage.getItem('hooks-test');
+			if (action === 'replace') element.script = '/new-behavior.js';
+			else element.script = null;
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(input.value).toBe('live edit');
+			expect(element.querySelector('[name=form-saver-retain]')).toBe(
+				checkbox,
+			);
+			expect(checkbox.checked).toBe(true);
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+		},
+	);
+
+	it('preserves pending submission cleanup when script changes', async () => {
+		await connect();
+		await element.saveFormState();
+		element
+			.querySelector('form')
+			.dispatchEvent(new Event('submit', { cancelable: true }));
+		element.script = '/replacement.js';
+		await element._handlePageHide();
+		expect(localStorage.getItem('hooks-test')).toBeNull();
+	});
+
+	it('preserves an opaque draft when restore-only sanitization has no encoder', async () => {
+		const original = '{"encrypted":"opaque"}';
+		localStorage.setItem('hooks-test', original);
+		element.configureStorage.mockImplementation(() => {
+			element.beforeRestore = () => ({
+				...state,
+				password: [{ type: 'password', value: 'legacy' }],
+			});
+		});
+		await connect();
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+		expect(element.querySelector('input').value).toBe('current');
+		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeRestore');
+	});
+
+	it('preserves an incompatible save-only envelope during restore', async () => {
+		const original = JSON.stringify({ wrapped: state });
+		localStorage.setItem('hooks-test', original);
+		element.configureStorage.mockImplementation(() => {
+			element.beforeSave = hooks.beforeSave;
+		});
+		await connect();
+		await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+		expect(errors.mock.calls[0][0].detail.operation).toBe('beforeRestore');
+	});
+
+	it.each([
+		new ArrayBuffer(8),
+		{ ciphertext: undefined },
+		{ value: NaN },
+		{ value: new Date() },
+		[undefined],
+	])(
+		'rejects unsupported payload %j before replacing a stored draft',
+		async (payload) => {
+			const original = JSON.stringify({ wrapped: state });
+			localStorage.setItem('hooks-test', original);
+			hooks.beforeSave.mockResolvedValue(payload);
+			await connect();
+			await element.saveFormState();
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+			expect(errors).toHaveBeenCalled();
+		},
+	);
+
+	it('accepts nested JSON payloads with repeated non-circular references', async () => {
+		const shared = Object.assign(Object.create(null), { value: 'shared' });
+		const payload = {
+			first: shared,
+			second: shared,
+			entries: [null, true, 42, 'text'],
+		};
+		hooks.beforeSave.mockResolvedValue(payload);
+		await connect();
+		await element.saveFormState();
+		expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual(payload);
+		expect(errors).not.toHaveBeenCalled();
+	});
+
+	it('reports circular payloads without replacing an existing draft', async () => {
+		const original = JSON.stringify({ wrapped: state });
+		localStorage.setItem('hooks-test', original);
+		const payload = {};
+		payload.self = payload;
+		hooks.beforeSave.mockResolvedValue(payload);
+		await connect();
+		await element.saveFormState();
+		expect(localStorage.getItem('hooks-test')).toBe(original);
+		expect(errors.mock.calls[0][0].detail.operation).toBe('write');
 	});
 
 	it.each(['clear', 'disconnect', 'storage-key', 'script', 'submit'])(

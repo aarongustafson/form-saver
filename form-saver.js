@@ -177,11 +177,43 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	static _saveToStorage(storage_key, payload) {
+		FormSaverElement._validatePayload(payload);
 		const serialized = JSON.stringify(payload);
 		if (serialized === undefined) {
 			throw new TypeError('The saved payload must be JSON-serializable.');
 		}
 		window.localStorage.setItem(storage_key, serialized);
+	}
+
+	static _validatePayload(value, ancestors = new Set()) {
+		if (
+			value === null ||
+			typeof value === 'string' ||
+			typeof value === 'boolean'
+		)
+			return;
+		if (typeof value === 'number' && Number.isFinite(value)) return;
+		if (
+			typeof value !== 'object' ||
+			ancestors.has(value) ||
+			(!Array.isArray(value) &&
+				![Object.prototype, null].includes(
+					Object.getPrototypeOf(value),
+				)) ||
+			Object.getOwnPropertySymbols(value).length > 0 ||
+			'toJSON' in value
+		) {
+			throw new TypeError(
+				'The saved payload must contain only JSON values.',
+			);
+		}
+		ancestors.add(value);
+		for (const item of Array.isArray(value)
+			? Array.from(value)
+			: Object.values(value)) {
+			FormSaverElement._validatePayload(item, ancestors);
+		}
+		ancestors.delete(value);
 	}
 
 	static _readFromStorage(storage_key, empty_value = null, strict = false) {
@@ -240,7 +272,7 @@ export class FormSaverElement extends HTMLElement {
 			);
 		if (!valid) {
 			throw new TypeError(
-				'beforeRestore must return a valid form state object.',
+				'Restoration requires a valid form state object.',
 			);
 		}
 	}
@@ -322,7 +354,12 @@ export class FormSaverElement extends HTMLElement {
 			boundSubmitHandler: (event) => this._handleSubmit(event),
 			boundPageHideHandler: () => this._handlePageHide(),
 			boundResetHandler: () => {
-				queueMicrotask(() => this.saveFormState());
+				this._cancelPendingSave();
+				const revision = ++this._internals.revision;
+				queueMicrotask(() => {
+					if (this._isCurrentOperation(revision))
+						this.saveFormState();
+				});
 			},
 		};
 	}
@@ -399,8 +436,7 @@ export class FormSaverElement extends HTMLElement {
 				this._computeStorageKey();
 				break;
 			case 'script':
-				this.disconnectedCallback();
-				if (this.isConnected) this._initialize();
+				this._restartBehavior();
 				break;
 		}
 	}
@@ -526,7 +562,10 @@ export class FormSaverElement extends HTMLElement {
 		}
 		if (this._internals[name] === (value ?? null)) return;
 		this._internals[name] = value ?? null;
-		if (!this._internals.behaviorPending) this._internals.revision++;
+		if (!this._internals.behaviorPending) {
+			this._cancelPendingSave();
+			this._internals.revision++;
+		}
 	}
 
 	get _usesAsyncStorage() {
@@ -576,6 +615,7 @@ export class FormSaverElement extends HTMLElement {
 	 * Restores form state from localStorage.
 	 */
 	restoreFormState() {
+		this._cancelPendingSave();
 		if (!this._internals.form || !this._internals.storageKey) {
 			return;
 		}
@@ -611,6 +651,20 @@ export class FormSaverElement extends HTMLElement {
 		this._addFormListeners();
 		this._renderRetentionControl();
 		this._internals.initialized = true;
+		this._startBehavior();
+		this.restoreFormState();
+	}
+
+	_restartBehavior() {
+		this._cancelPendingSave();
+		this._internals.revision++;
+		this._internals.connection++;
+		this._internals.behaviorReady = null;
+		this._cancelBehavior();
+		this._startBehavior();
+	}
+
+	_startBehavior() {
 		if (this.hasAttribute('script')) {
 			const script = this.script;
 			const connection = this._internals.connection;
@@ -621,7 +675,6 @@ export class FormSaverElement extends HTMLElement {
 				this._loadBehaviorScript(script, connection, controller),
 			);
 		}
-		this.restoreFormState();
 	}
 
 	async _loadBehaviorScript(script, connection, controller) {
@@ -747,11 +800,15 @@ export class FormSaverElement extends HTMLElement {
 				? await beforeRestore.call(this, payload)
 				: payload;
 			if (!this._isCurrentOperation(revision)) return;
-			if (beforeRestore)
-				FormSaverElement._validateRestoredState(restored);
+			FormSaverElement._validateRestoredState(restored);
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(restored);
 			if (changed) {
+				if (beforeRestore && !this.beforeSave) {
+					throw new TypeError(
+						'Sanitizing transformed storage requires a beforeSave callback; the original draft was preserved.',
+					);
+				}
 				if (state) await this._saveTransformedState(state, revision);
 				else this._removeSavedState();
 			}
@@ -1028,6 +1085,7 @@ export class FormSaverElement extends HTMLElement {
 	 * the key from the form's method and action.
 	 */
 	_computeStorageKey() {
+		this._cancelPendingSave();
 		this._internals.revision++;
 		if (this.storageKey) {
 			this._internals.storageKey = this.storageKey;

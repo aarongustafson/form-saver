@@ -176,6 +176,9 @@ synchronous. New edits, saves, clearing, storage-key
 changes, disconnection, and script changes invalidate stale async work.
 Replacing a storage callback also invalidates pending work, except while the
 current behavior initializer is still configuring the element.
+Changing callbacks or the storage key also cancels older debounced autosaves.
+An explicit restore cancels an older queued autosave; edits made after that
+restore starts still take precedence.
 
 ## Behavior Modules
 
@@ -204,6 +207,10 @@ A module without an initializer is also supported.
 The [writing-help demo](./demo/behavior.html) uses this pattern without either
 storage hook. The component waits for initialization before restoring or saving
 drafts, even when the script only adds behavior.
+Do not await `saveFormState()` or `restoreFormState()` inside `initialize()`.
+Those methods wait for initialization, so awaiting them there creates a circular
+wait. Configure callbacks and connected behavior, then let initialization finish;
+the component performs its initial restoration afterward.
 
 On disconnection or a `script` change, the component invalidates pending work,
 aborts `signal`, clears the storage callbacks, and calls cleanup. Cleanup errors
@@ -212,6 +219,9 @@ after it was superseded, that cleanup runs immediately. Use the signal for
 listeners and requests, and check `signal.aborted` after awaits before installing
 callbacks or changing UI. The component cannot cancel a module import or undo
 arbitrary application side effects.
+Changing `script` restarts only the behavior module. It preserves live fields,
+the retention checkbox, and pending submission cleanup, and does not restore
+stored values again. Call `restoreFormState()` explicitly if that is intended.
 
 ## Optional Storage Hooks
 
@@ -241,7 +251,12 @@ application-defined functions, not package APIs. See the runnable
 public demo key. Web Crypto requires a secure context (HTTPS or localhost).
 
 - `beforeSave(state)` receives the serialized state, with password and file
-  controls excluded, and returns a JSON-serializable payload.
+  controls excluded, and returns a JSON-value payload: `null`, strings,
+  booleans, finite numbers, arrays of those values, or plain objects containing
+  those values. Unsupported values such as `undefined`, sparse arrays,
+  `ArrayBuffer`, typed arrays, dates, custom serialization, and circular
+  references report an error before storage is replaced. Convert binary
+  ciphertext to an array of numbers or an encoded string.
 - `beforeRestore(payload)` receives the parsed stored payload **before**
   form-state validation and returns the original state shape:
   `{ fieldName: [{ type: 'text', value: 'example' }] }`. Checkbox/radio entries
@@ -252,7 +267,16 @@ public demo key. Web Crypto requires a secure context (HTTPS or localhost).
   boolean `checked` for checkboxes/radios, or a string array `values` instead of
   `value` for multiple selects. Password entries are removed after validation,
   and password controls are never populated. Sanitized drafts pass through
-  `beforeSave` again if it is configured.
+  `beforeSave` again if it is configured. If a restore callback returns state
+  requiring sanitization but no save callback is available, restoration reports
+  an error and preserves the original payload and fields rather than writing
+  decoded values or deleting the draft.
+
+A save-only callback can redact fields while preserving the form-state shape.
+A restore-only callback can migrate compatible stored data. If a save callback
+changes the storage format (for example, wrapping or encrypting it), configure
+a matching restore callback. Incompatible payloads report a restoration error
+and remain stored unchanged, even when no restore callback is configured.
 
 Saves and restoration wait for initialization. If loading, initialization, or
 a hook fails, `form-saver-error` reports it; the component does **not** retry
@@ -261,8 +285,9 @@ untouched. Malformed stored JSON also reports a `read` error when a script or
 hook is configured, without removing the stored payload. Existing plaintext
 drafts are not automatically migrated: use a
 new storage key or implement an explicit migration policy in your module.
-Changing `script` reinitializes the component; removing it deliberately returns
-to plaintext storage. Changing `storage-key` invalidates pending work but does
+Changing `script` restarts its behavior; removing it deliberately returns
+future saves to plaintext storage without automatically reading or migrating
+the old payload. Changing `storage-key` invalidates pending work but does
 not automatically restore the new key; call `restoreFormState()` if needed.
 
 The latest operation wins: delayed saves cannot overwrite a newer draft or
