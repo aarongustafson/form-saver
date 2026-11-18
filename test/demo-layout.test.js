@@ -15,6 +15,16 @@ it('trims block-edge margins inside demo sections', async () => {
 	);
 });
 
+it('introduces each behavior demo once on the main demo page', async () => {
+	const template = document.createElement('template');
+	template.innerHTML = await readFile('demo/index.html', 'utf8');
+	for (const page of ['behavior.html', 'encrypted.html']) {
+		expect(
+			template.content.querySelectorAll(`main a[href="./${page}"]`),
+		).toHaveLength(1);
+	}
+});
+
 it('keeps code readable while progressively enhancing every full demo page', async () => {
 	let pages = 0;
 	for (const file of await readdir('demo', { recursive: true })) {
