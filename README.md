@@ -333,6 +333,10 @@ sensitive information that should not persist on the device. The component
 defensively removes identifiable password entries from recognizable native
 stored drafts, including drafts with null fields or null control entries. This
 cleanup concerns existing storage, not newly collected password inputs.
+It also runs when a behavior module supplies no restore callback. Recognizable
+native drafts are scrubbed before remaining-field validation, so an invalid
+control value cannot prevent removal of an identifiable stored password.
+Invalid remaining fields report an error and are not applied to the form.
 Incompatible application payloads are preserved rather than treated as native
 drafts, including envelopes containing byte or string arrays; application
 restore hooks remain responsible for decoding their format.

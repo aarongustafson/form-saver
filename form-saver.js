@@ -277,6 +277,34 @@ export class FormSaverElement extends HTMLElement {
 		}
 	}
 
+	static _isNativeDraft(value) {
+		return (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.values(value).every(
+				(field) =>
+					field === null ||
+					(Array.isArray(field) &&
+						field.every(
+							(control) =>
+								control === null ||
+								(typeof control === 'object' &&
+									!Array.isArray(control) &&
+									typeof control.type === 'string'),
+						)),
+			) &&
+			Object.values(value).some(
+				(field) =>
+					Array.isArray(field) &&
+					field.some(
+						(control) =>
+							control && typeof control.type === 'string',
+					),
+			)
+		);
+	}
+
 	static _sanitizeStoredState(value) {
 		if (!value || typeof value !== 'object' || Array.isArray(value)) {
 			return { state: null, changed: value !== null };
@@ -802,7 +830,9 @@ export class FormSaverElement extends HTMLElement {
 				? await beforeRestore.call(this, payload)
 				: payload;
 			if (!this._isCurrentOperation(revision)) return;
-			FormSaverElement._validateRestoredState(restored);
+			if (beforeRestore || !FormSaverElement._isNativeDraft(restored)) {
+				FormSaverElement._validateRestoredState(restored);
+			}
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(restored);
 			if (changed) {
@@ -814,6 +844,7 @@ export class FormSaverElement extends HTMLElement {
 				if (state) await this._saveTransformedState(state, revision);
 				else this._removeSavedState();
 			}
+			if (state) FormSaverElement._validateRestoredState(state);
 			if (state && this._isCurrentOperation(revision)) {
 				FormSaverElement._applySerializedState(
 					this._internals.form,
@@ -927,37 +958,10 @@ export class FormSaverElement extends HTMLElement {
 				this._internals.storageKey,
 			);
 			if (stored_state === null) return null;
-			const nativeDraft =
-				typeof stored_state === 'object' &&
-				!Array.isArray(stored_state) &&
-				Object.values(stored_state).every(
-					(value) =>
-						value === null ||
-						(Array.isArray(value) &&
-							value.every(
-								(control) =>
-									control === null ||
-									(typeof control === 'object' &&
-										!Array.isArray(control) &&
-										typeof control.type === 'string'),
-							)),
-				) &&
-				Object.values(stored_state).some(
-					(value) =>
-						Array.isArray(value) &&
-						value.some(
-							(control) =>
-								control &&
-								typeof control === 'object' &&
-								typeof control.type === 'string',
-						),
-				);
-			if (!nativeDraft)
+			if (!FormSaverElement._isNativeDraft(stored_state))
 				FormSaverElement._validateRestoredState(stored_state);
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(stored_state);
-			if (state) FormSaverElement._validateRestoredState(state);
-
 			if (changed) {
 				if (state) {
 					this._writeSavedState(state);
@@ -965,6 +969,7 @@ export class FormSaverElement extends HTMLElement {
 					this._removeSavedState();
 				}
 			}
+			if (state) FormSaverElement._validateRestoredState(state);
 
 			return state;
 		} catch (error) {

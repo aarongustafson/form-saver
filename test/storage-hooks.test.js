@@ -59,6 +59,54 @@ describe('storage transformation modules', () => {
 		);
 	}
 
+	it.each(['plain', 'behavior'])(
+		'scrubs stored passwords before validating malformed controls with %s configuration',
+		async (mode) => {
+			localStorage.setItem(
+				'hooks-test',
+				JSON.stringify({
+					message: [{ type: 'text', value: 42 }, null],
+					password: [{ type: 'password', value: 'old secret' }],
+					oldField: null,
+				}),
+			);
+			if (mode === 'plain') {
+				element.script = null;
+				document.body.append(element);
+				await Promise.resolve();
+			} else {
+				element.configureStorage.mockImplementation(() => {});
+				await connect();
+			}
+			await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+			expect(localStorage.getItem('hooks-test')).not.toContain(
+				'old secret',
+			);
+			expect(element.querySelector('input').value).toBe('current');
+			expect(element.querySelector('[name=password]').value).toBe(
+				'secret',
+			);
+		},
+	);
+
+	it('restores valid native fields after behavior-only password cleanup', async () => {
+		localStorage.setItem(
+			'hooks-test',
+			JSON.stringify({
+				...state,
+				password: [{ type: 'password', value: 'old secret' }],
+				oldField: null,
+			}),
+		);
+		element.configureStorage.mockImplementation(() => {});
+		await connect();
+		await vi.waitFor(() =>
+			expect(element.querySelector('input').value).toBe('saved'),
+		);
+		expect(JSON.parse(localStorage.getItem('hooks-test'))).toEqual(state);
+		expect(errors).not.toHaveBeenCalled();
+	});
+
 	it('awaits per-element initialization, transforms saves and restores before validation', async () => {
 		const init = deferred();
 		element.configureStorage.mockImplementation(async () => {
