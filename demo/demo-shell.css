@@ -1,3 +1,7 @@
+[data-syntax-theme] {
+	color-scheme: inherit;
+}
+
 :root {
 	color-scheme: light dark;
 	--accent: light-dark(#075e58, #8ee3d1);
@@ -56,8 +60,15 @@ body::before {
 	outline-offset: 4px;
 }
 
-h1 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
 	font-family: system-monospace, monospace;
+}
+h1 {
 	font-size: clamp(2rem, 5vw, 4.5rem);
 	line-height: 1.15;
 	margin-block: 1rem 1.5rem;
@@ -318,11 +329,41 @@ h1 code {
 }
 
 @media (forced-colors: active), (prefers-contrast: more) {
+	[data-syntax-theme] {
+		--syntax-background: Field;
+		--syntax-foreground: FieldText;
+		--syntax-comment: FieldText;
+		--syntax-keyword: FieldText;
+		--syntax-operator: FieldText;
+		--syntax-string: FieldText;
+		--syntax-constant: FieldText;
+		--syntax-function: FieldText;
+		--syntax-type: FieldText;
+		--syntax-variable: FieldText;
+		--syntax-property: FieldText;
+		--syntax-tag: FieldText;
+		--syntax-selector: FieldText;
+		--syntax-inserted: FieldText;
+		--syntax-deleted: FieldText;
+	}
+	body[data-syntax-theme] micro-lighter pre,
+	body[data-syntax-theme] pre,
+	body[data-syntax-theme] .event-log,
 	pre,
 	.event-log {
 		background-color: Field;
 		background-image: none;
 		color: FieldText;
+	}
+	micro-lighter {
+		background: Field;
+		color: FieldText;
+	}
+	body[data-syntax-theme] micro-lighter pre,
+	micro-lighter pre,
+	micro-lighter::part(copy-button),
+	micro-lighter::part(line-numbers) {
+		background-color: transparent;
 	}
 	body::before {
 		display: none;

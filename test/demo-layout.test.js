@@ -61,6 +61,14 @@ it('keeps code readable while progressively enhancing every full demo page', asy
 			expect(lighter.getAttribute('language'), file).toMatch(
 				/^(html|javascript|css|json|bash)$/,
 			);
+			if (/^\s*[\w$]+\.addEventListener\(/.test(code.textContent)) {
+				expect(lighter.getAttribute('language'), file).toBe(
+					'javascript',
+				);
+				expect(lighter.getAttribute('data-label'), file).toBe(
+					'JavaScript',
+				);
+			}
 			expect(lighter.getAttribute('controls'), file).toBe('copy');
 			expect(pre.getAttribute('tabindex'), file).toBe('0');
 			expect(pre.getAttribute('aria-label'), file).toBeTruthy();
@@ -70,53 +78,139 @@ it('keeps code readable while progressively enhancing every full demo page', asy
 	expect(pages).toBeGreaterThan(0);
 });
 
+let optionalTheme;
 afterEach(() => {
 	document.body.replaceChildren();
+	document.head
+		.querySelectorAll('link[data-code-theme]')
+		.forEach((link) => link.remove());
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	vi.resetModules();
 });
 
-it('preserves the complete snippet when enabling syntax highlighting', async () => {
+function authoredSnippet() {
+	vi.spyOn(document.head, 'insertBefore').mockImplementation((theme) => {
+		optionalTheme = theme;
+		return theme;
+	});
 	document.body.innerHTML = `
 		<p id="microlighter-status" hidden></p>
-		<micro-lighter><pre><code><mark>&lt;example-tag&gt;</mark>
+		<micro-lighter language="html"><pre><code><mark>&lt;example-tag&gt;</mark>
   &lt;p&gt;Keep this text&lt;/p&gt;
 <mark>&lt;/example-tag&gt;</mark></code></pre></micro-lighter>`;
-	const code = document.querySelector('code');
-	const text = code.textContent;
+	vi.stubGlobal('Highlight', class {});
+	vi.stubGlobal('CSS', { highlights: new Map() });
+	vi.doMock(
+		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/grammars/html.js',
+		() => ({ default: { dependencies: ['javascript'] } }),
+	);
+	vi.doMock(
+		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/grammars/javascript.js',
+		() => ({ default: { dependencies: [] } }),
+	);
 	vi.doMock(
 		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/micro-lighter-element.min.js',
 		() => ({}),
 	);
+	return document.querySelector('code');
+}
+
+it('preserves complete text after loading the required grammars and element', async () => {
+	const code = authoredSnippet();
+	const text = code.textContent;
 	await import('../demo/code-examples.js');
 	expect(code.textContent).toBe(text);
 	expect(code.childNodes).toHaveLength(1);
 	expect(document.querySelector('#microlighter-status').hidden).toBe(true);
+	const theme = optionalTheme;
+	expect(theme.media).toBe('print');
+	theme.dispatchEvent(new Event('load'));
+	expect(theme.media).toBe('all');
 });
 
-it('keeps authored highlights and reports an unavailable optional enhancement', async () => {
-	document.body.innerHTML = `
-		<p id="microlighter-status" hidden></p>
-		<micro-lighter><pre><code><mark>&lt;example-tag&gt;</mark></code></pre></micro-lighter>`;
-	const error = new Error('CDN unavailable');
+it('retains authored marks and reports a required grammar failure', async () => {
+	const code = authoredSnippet();
 	const log = vi.spyOn(console, 'error').mockImplementation(() => {});
 	vi.doMock(
-		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/micro-lighter-element.min.js',
+		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/grammars/javascript.js',
 		() => {
-			throw error;
+			throw new Error('Grammar unavailable');
 		},
 	);
 	await import('../demo/code-examples.js');
-	expect(document.querySelector('code mark')?.textContent).toBe(
-		'<example-tag>',
-	);
-	const status = document.querySelector('#microlighter-status');
-	expect(status.hidden).toBe(false);
-	expect(status.textContent).toContain(
-		'Code remains readable and selectable',
-	);
+	expect(code.querySelector('mark')?.textContent).toBe('<example-tag>');
+	expect(document.querySelector('#microlighter-status').hidden).toBe(false);
 	expect(log).toHaveBeenCalledWith(
 		'MicroLighter could not load:',
 		expect.any(Error),
 	);
+});
+
+it('retains authored marks when custom highlights are unsupported', async () => {
+	const code = authoredSnippet();
+	vi.stubGlobal('Highlight', undefined);
+	vi.spyOn(console, 'error').mockImplementation(() => {});
+	await import('../demo/code-examples.js');
+	expect(code.querySelector('mark')?.textContent).toBe('<example-tag>');
+	expect(
+		document.querySelector('#microlighter-status').textContent,
+	).toContain('Code remains readable and selectable');
+	expect(document.querySelector('#microlighter-status').hidden).toBe(false);
+});
+
+it('retains authored marks and reports an unavailable entry module', async () => {
+	const code = authoredSnippet();
+	vi.spyOn(console, 'error').mockImplementation(() => {});
+	vi.doMock(
+		'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/micro-lighter-element.min.js',
+		() => {
+			throw new Error('CDN unavailable');
+		},
+	);
+	await import('../demo/code-examples.js');
+	expect(code.querySelector('mark')?.textContent).toBe('<example-tag>');
+	expect(document.querySelector('#microlighter-status').hidden).toBe(false);
+});
+
+it.each(['before', 'after'])(
+	'reports a theme-only failure %s successful enhancement without claiming the controls failed',
+	async (timing) => {
+		const code = authoredSnippet();
+		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+		if (timing === 'before') {
+			vi.doMock(
+				'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/micro-lighter-element.min.js',
+				() => {
+					optionalTheme.dispatchEvent(new Event('error'));
+					return {};
+				},
+			);
+		}
+		await import('../demo/code-examples.js');
+		if (timing === 'after') optionalTheme.dispatchEvent(new Event('error'));
+		const status = document.querySelector('#microlighter-status');
+		expect(status.hidden).toBe(false);
+		expect(status.textContent).toContain(
+			'Code highlighting and Copy controls are available',
+		);
+		expect(status.textContent).toContain('syntax theme could not load');
+		expect(code.childNodes).toHaveLength(1);
+		expect(log).toHaveBeenCalledWith(
+			'MicroLighter theme could not load:',
+			expect.any(Error),
+		);
+	},
+);
+
+it('does not make the optional CDN stylesheet render-blocking', async () => {
+	for (const file of await readdir('demo', { recursive: true })) {
+		if (!file.endsWith('.html')) continue;
+		const template = document.createElement('template');
+		template.innerHTML = await readFile(`demo/${file}`, 'utf8');
+		expect(
+			template.content.querySelector('link[href*="microlighter"]'),
+			file,
+		).toBeNull();
+	}
 });
