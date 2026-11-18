@@ -931,7 +931,16 @@ export class FormSaverElement extends HTMLElement {
 				typeof stored_state === 'object' &&
 				!Array.isArray(stored_state) &&
 				Object.values(stored_state).every(
-					(value) => value === null || Array.isArray(value),
+					(value) =>
+						value === null ||
+						(Array.isArray(value) &&
+							value.every(
+								(control) =>
+									control === null ||
+									(typeof control === 'object' &&
+										!Array.isArray(control) &&
+										typeof control.type === 'string'),
+							)),
 				) &&
 				Object.values(stored_state).some(
 					(value) =>

@@ -331,10 +331,11 @@ Without an encryption transformation, saved values are stored as plain text in
 on the same origin can read them, so avoid wrapping forms that collect other
 sensitive information that should not persist on the device. The component
 defensively removes identifiable password entries from recognizable native
-stored drafts, including drafts with null or malformed array entries. This
+stored drafts, including drafts with null fields or null control entries. This
 cleanup concerns existing storage, not newly collected password inputs.
 Incompatible application payloads are preserved rather than treated as native
-drafts; application restore hooks remain responsible for decoding their format.
+drafts, including envelopes containing byte or string arrays; application
+restore hooks remain responsible for decoding their format.
 
 Encryption is only as useful as the application's key and session management.
 Do not persist a real encryption key alongside drafts. Authorize key access on

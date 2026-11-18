@@ -213,7 +213,7 @@ describe('FormSaverElement', () => {
 			localStorage.setItem(
 				key,
 				JSON.stringify({
-					username: [{ type: 'text', value: 'Ada' }],
+					username: [null, { type: 'text', value: 'Ada' }],
 					password: [{ type: 'password', value: 'old secret' }],
 					oldField: null,
 				}),

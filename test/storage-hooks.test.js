@@ -746,24 +746,40 @@ describe('storage transformation modules', () => {
 		expect(errors).toHaveBeenCalledOnce();
 	});
 
-	it('preserves direct-hook payloads through reconnect until the decoder is reinstalled', async () => {
-		element.script = null;
-		element.beforeSave = hooks.beforeSave;
-		element.beforeRestore = hooks.beforeRestore;
-		document.body.append(element);
-		await Promise.resolve();
-		await element.saveFormState();
-		const original = localStorage.getItem('hooks-test');
-		element.remove();
-		document.body.append(element);
-		await Promise.resolve();
-		expect(localStorage.getItem('hooks-test')).toBe(original);
-		expect(errors.mock.calls[0][0].detail.operation).toBe('read');
-		element.beforeRestore = hooks.beforeRestore;
-		await element.restoreFormState();
-		expect(element.querySelector('input').value).toBe('current');
-		expect(localStorage.getItem('hooks-test')).toBe(original);
-	});
+	it.each([
+		{ wrapped: state },
+		{
+			iv: [1, 2],
+			ciphertext: [3, 4],
+			metadata: [{ type: 'password', value: 'metadata' }],
+		},
+		{
+			ciphertext: ['encoded', null],
+			metadata: [{ type: 'password', value: 'metadata' }],
+		},
+	])(
+		'preserves direct-hook payload %j through reconnect until the decoder is reinstalled',
+		async (payload) => {
+			hooks.beforeSave.mockResolvedValue(payload);
+			hooks.beforeRestore.mockResolvedValue(state);
+			element.script = null;
+			element.beforeSave = hooks.beforeSave;
+			element.beforeRestore = hooks.beforeRestore;
+			document.body.append(element);
+			await Promise.resolve();
+			await element.saveFormState();
+			const original = localStorage.getItem('hooks-test');
+			element.remove();
+			document.body.append(element);
+			await Promise.resolve();
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+			expect(errors.mock.calls[0][0].detail.operation).toBe('read');
+			element.beforeRestore = hooks.beforeRestore;
+			await element.restoreFormState();
+			expect(element.querySelector('input').value).toBe('saved');
+			expect(localStorage.getItem('hooks-test')).toBe(original);
+		},
+	);
 
 	it.each(['script', 'hooks'])(
 		'retains live selected fields when %s are removed after submit',
