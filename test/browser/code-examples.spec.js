@@ -12,6 +12,7 @@ async function serveDemo(
 		stalledTheme = false,
 		themeFailure = false,
 		distinctFields = false,
+		translucentFields = false,
 	} = {},
 ) {
 	await page.addInitScript(() => {
@@ -71,14 +72,24 @@ async function serveDemo(
 				);
 		}
 		if (
-			distinctFields &&
+			(distinctFields || translucentFields) &&
 			extension === 'css' &&
 			!url.href.startsWith(cdn)
 		) {
 			body = body
 				.toString()
-				.replace(/\bFieldText\b/g, 'rgb(255, 255, 0)')
-				.replace(/\bField\b/g, 'rgb(20, 30, 40)');
+				.replace(
+					/\bFieldText\b/g,
+					translucentFields ? '#ffffffd8' : 'rgb(255, 255, 0)',
+				)
+				.replace(
+					/\bField\b/g,
+					translucentFields ? '#ffffff3f' : 'rgb(20, 30, 40)',
+				);
+			if (translucentFields)
+				body = body
+					.replace(/\bCanvasText\b/g, '#ffffff')
+					.replace(/\bCanvas\b/g, '#1e1e1e');
 		}
 		await route.fulfill({
 			body,
@@ -229,7 +240,11 @@ test('loaded syntax styles respect distinct high-contrast field surfaces and inh
 		'all',
 	);
 	const code = page.locator('micro-lighter pre').first();
-	await expect(code).toHaveCSS('background-color', 'rgb(20, 30, 40)');
+	await expect(page.locator('micro-lighter').first()).toHaveCSS(
+		'background-color',
+		'rgb(20, 30, 40)',
+	);
+	await expect(code).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 	await expect(code).toHaveCSS('color', 'rgb(255, 255, 0)');
 	await expect(code).toHaveCSS('--syntax-keyword', 'rgb(255, 255, 0)');
 	await page.addStyleTag({ content: ':root { color-scheme: light; }' });
@@ -251,5 +266,79 @@ test('all heading levels use the shared monospace alias', async ({ page }) => {
 		)
 			continue;
 		await expect(heading).toHaveCSS('font-family', /system-monospace/);
+	}
+});
+
+test('translucent high-contrast fields retain at least 4.5:1 composited code contrast', async ({
+	page,
+}) => {
+	await serveDemo(page, { translucentFields: true });
+	await page.emulateMedia({ contrast: 'more', colorScheme: 'dark' });
+	await page.goto('http://code-demo.test/demo/index.html');
+	await expect(page.locator('link[data-code-theme]')).toHaveAttribute(
+		'media',
+		'all',
+	);
+	const code = page.locator('micro-lighter pre code').first();
+	await expect(
+		page
+			.locator('micro-lighter')
+			.first()
+			.getByRole('button', { name: 'Copy', exact: true }),
+	).toBeVisible();
+	for (const surface of [
+		code,
+		page
+			.locator('micro-lighter')
+			.first()
+			.getByRole('button', { name: 'Copy', exact: true }),
+	]) {
+		const contrast = await surface.evaluate((element) => {
+			const canvas = document.createElement('canvas');
+			canvas.width = canvas.height = 1;
+			const context = canvas.getContext('2d');
+			if (!context)
+				throw new Error('Canvas color measurement is unavailable.');
+			const ancestors = [];
+			for (let node = element; node;) {
+				ancestors.unshift(node);
+				const tree = node.getRootNode();
+				node =
+					node.assignedSlot ||
+					node.parentElement ||
+					(tree instanceof ShadowRoot ? tree.host : null);
+			}
+			for (const node of ancestors) {
+				const style = getComputedStyle(node);
+				if (style.backgroundImage !== 'none')
+					throw new Error(
+						'The high-contrast fixture must have no background images.',
+					);
+				context.fillStyle = style.backgroundColor;
+				context.fillRect(0, 0, 1, 1);
+			}
+			const background = context.getImageData(0, 0, 1, 1).data;
+			if (background[3] !== 255)
+				throw new Error('The measured code background must be opaque.');
+			context.fillStyle = getComputedStyle(element).color;
+			context.fillRect(0, 0, 1, 1);
+			const foreground = context.getImageData(0, 0, 1, 1).data;
+			const luminance = (rgb) =>
+				[...rgb].slice(0, 3).reduce((sum, channel, index) => {
+					const value = channel / 255;
+					return (
+						sum +
+						(value <= 0.04045
+							? value / 12.92
+							: ((value + 0.055) / 1.055) ** 2.4) *
+							[0.2126, 0.7152, 0.0722][index]
+					);
+				}, 0);
+			const values = [luminance(background), luminance(foreground)].sort(
+				(a, b) => b - a,
+			);
+			return (values[0] + 0.05) / (values[1] + 0.05);
+		});
+		expect(contrast).toBeGreaterThanOrEqual(4.5);
 	}
 });
