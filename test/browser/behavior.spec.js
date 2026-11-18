@@ -34,7 +34,7 @@ test('a behavior-only module adds keyboard-operable help without storage hooks',
 	await expect(page.getByLabel('Message', { exact: true })).toHaveValue(
 		'Invented draft',
 	);
-	await expect(page.getByRole('status')).toBeEmpty();
+	await expect(page.locator('form-saver').getByRole('status')).toBeEmpty();
 	await page.locator('form-saver').evaluate((saver) => {
 		saver.remove();
 		document.querySelector('.demo').append(saver);
@@ -50,7 +50,9 @@ test('behavior module failure leaves help and the native form available', async 
 }) => {
 	await page.route('**/writing-help.js', (route) => route.abort());
 	await page.goto('/demo/behavior.html');
-	await expect(page.getByRole('status')).toContainText('Keep a copy');
+	await expect(page.locator('form-saver').getByRole('status')).toContainText(
+		'Keep a copy',
+	);
 	await expect(page.locator('#writing-tips')).toBeVisible();
 	await expect(page.locator('[data-toggle-help]')).toBeHidden();
 	await page.getByLabel('Message', { exact: true }).fill('Still editable');

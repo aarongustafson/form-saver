@@ -4,20 +4,46 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Behavior modules - &lt;form-saver&gt;</title>
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/themes/github.css"
+		/>
 		<link rel="stylesheet" href="./styles.css" />
+		<link rel="stylesheet" href="./demo-shell.css" />
 	</head>
-	<body>
+	<body data-syntax-theme="github">
+		<a class="skip-link" href="#main">Skip to examples</a>
 		<header>
-			<h1>&lt;form-saver&gt; behavior modules</h1>
-			<p>
+			<p class="eyebrow">Web component / behavior</p>
+			<h1>&lt;form-saver&gt;</h1>
+			<p class="lede">
 				<a
 					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
 					>README</a
 				>
 				· <a href="./index.html">All examples</a>
 			</p>
+			<nav aria-label="Component resources">
+				<a
+					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
+					>Read the README</a
+				>
+				<a href="https://github.com/aarongustafson/form-saver"
+					>View on GitHub</a
+				>
+				<a href="./index.html">All examples</a>
+				<a href="./esm.html">esm.sh example</a>
+				<a href="./unpkg.html">unpkg example</a>
+			</nav>
 		</header>
-		<main>
+		<main id="main" tabindex="-1">
+			<p
+				id="microlighter-status"
+				class="enhancement-status"
+				role="status"
+				hidden
+			></p>
+
 			<section class="demo-section">
 				<h2>Connect behavior without storage hooks</h2>
 				<p>
@@ -47,7 +73,16 @@
 					submission service.
 				</p>
 				<div class="code-demo-pair">
-					<pre tabindex="0"><code><mark>&lt;form-saver
+					<micro-lighter
+						class="code-panel"
+						language="html"
+						controls="copy"
+						data-label="HTML"
+					>
+						<pre
+							aria-label="Connect behavior without storage hooks code 1"
+							tabindex="0"
+						><code><mark>&lt;form-saver
   script="./writing-help.js"
   storage-key="demo:behavior"
 &gt;</mark>
@@ -76,6 +111,7 @@
   // authored presentation in its cleanup function.
   button.addEventListener('click', toggleHelp, { signal });
 <mark>}</mark></code></pre>
+					</micro-lighter>
 					<div class="demo">
 						<form-saver
 							script="./writing-help.js"
@@ -126,5 +162,6 @@
 		</footer>
 		<script src="./feedback.js" type="module"></script>
 		<script src="../define.js" type="module"></script>
+		<script type="module" src="./code-examples.js"></script>
 	</body>
 </html>

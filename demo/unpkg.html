@@ -4,20 +4,45 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>form-saver via unpkg</title>
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/themes/github.css"
+		/>
 		<link rel="stylesheet" href="./styles.css" />
+		<link rel="stylesheet" href="./demo-shell.css" />
 	</head>
-	<body>
+	<body data-syntax-theme="github">
+		<a class="skip-link" href="#main">Skip to examples</a>
 		<header>
-			<h1>&lt;form-saver&gt; via unpkg</h1>
-			<p>
+			<p class="eyebrow">Web component / unpkg</p>
+			<h1>&lt;form-saver&gt;</h1>
+			<p class="lede">
 				See the
 				<a href="https://github.com/aarongustafson/form-saver#readme"
 					>README</a
 				>
 				for installation and API documentation.
 			</p>
+			<nav aria-label="Component resources">
+				<a
+					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
+					>Read the README</a
+				>
+				<a href="https://github.com/aarongustafson/form-saver"
+					>View on GitHub</a
+				>
+				<a href="./index.html">All examples</a>
+				<a href="./esm.html">esm.sh example</a>
+			</nav>
 		</header>
-		<main>
+		<main id="main" tabindex="-1">
+			<p
+				id="microlighter-status"
+				class="enhancement-status"
+				role="status"
+				hidden
+			></p>
+
 			<p>
 				This page calls the guarded definition helper. Use invented
 				details: localStorage keeps drafts on this device. Retention
@@ -32,9 +57,16 @@
 			<section class="demo-section">
 				<h2>Explicit registration helper</h2>
 				<div class="code-demo-pair">
-					<pre
-						tabindex="0"
-					><code><mark>import { defineComponentName } from
+					<micro-lighter
+						class="code-panel"
+						language="javascript"
+						controls="copy"
+						data-label="JavaScript"
+					>
+						<pre
+							aria-label="Explicit registration helper code 1"
+							tabindex="0"
+						><code><mark>import { defineComponentName } from
   'https://unpkg.com/@aarongustafson/form-saver@latest/define.js?module';</mark>
 <mark>defineComponentName();</mark>
 
@@ -45,6 +77,7 @@
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
+					</micro-lighter>
 					<div class="demo">
 						<form-saver storage-key="demo:unpkg">
 							<form action="/demo-contact" method="post">
@@ -86,5 +119,6 @@
 
 			defineComponentName();
 		</script>
+		<script type="module" src="./code-examples.js"></script>
 	</body>
 </html>

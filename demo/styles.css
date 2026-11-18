@@ -1,3 +1,11 @@
+@font-face {
+	font-family: 'system-monospace';
+	src:
+		local('SFMono-Regular'), local('Menlo'), local('Monaco'),
+		local('Consolas'), local('Liberation Mono'), local('Courier New'),
+		local('monospace');
+}
+
 :root {
 	color-scheme: light dark;
 }
@@ -83,7 +91,7 @@ code {
 	color: ButtonText;
 	padding: 0.125rem 0.25rem;
 	border-radius: 3px;
-	font-family: ui-monospace, monospace;
+	font-family: system-monospace, monospace;
 	font-size: 0.9em;
 }
 pre {
