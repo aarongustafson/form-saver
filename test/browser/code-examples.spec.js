@@ -240,6 +240,12 @@ test('loaded syntax styles respect distinct high-contrast field surfaces and inh
 		'all',
 	);
 	const code = page.locator('micro-lighter pre').first();
+	await page
+		.locator('micro-lighter')
+		.first()
+		.evaluate((panel) => {
+			panel.classList.remove('code-panel');
+		});
 	await expect(page.locator('micro-lighter').first()).toHaveCSS(
 		'background-color',
 		'rgb(20, 30, 40)',

@@ -355,6 +355,10 @@ h1 code {
 		background-image: none;
 		color: FieldText;
 	}
+	micro-lighter {
+		background: Field;
+		color: FieldText;
+	}
 	body[data-syntax-theme] micro-lighter pre,
 	micro-lighter pre,
 	micro-lighter::part(copy-button),
