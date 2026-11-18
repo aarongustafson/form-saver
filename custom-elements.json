@@ -13,6 +13,44 @@
 					"members": [
 						{
 							"kind": "field",
+							"name": "script",
+							"type": { "text": "string | null" },
+							"description": "Behavior module URL with an optional initialize(element, { signal }) export and cleanup function.",
+							"privacy": "public",
+							"attribute": "script"
+						},
+						{
+							"kind": "field",
+							"name": "beforeSave",
+							"type": { "text": "FormSaverBeforeSave | null" },
+							"default": "null",
+							"description": "Optional async transformation from collected form state to a JSON-serializable payload. Cleared on disconnect or script reinitialization.",
+							"privacy": "public"
+						},
+						{
+							"kind": "field",
+							"name": "beforeRestore",
+							"type": { "text": "FormSaverBeforeRestore | null" },
+							"default": "null",
+							"description": "Optional async transformation from parsed payload to valid form state. Cleared on disconnect or script reinitialization.",
+							"privacy": "public"
+						},
+						{
+							"kind": "method",
+							"name": "loadModule",
+							"description": "Imports the resolved behavior module URL. May be overridden for a custom loader.",
+							"privacy": "public",
+							"parameters": [
+								{ "name": "url", "type": { "text": "string" } }
+							],
+							"return": {
+								"type": {
+									"text": "Promise<FormSaverBehaviorModule>"
+								}
+							}
+						},
+						{
+							"kind": "field",
 							"name": "retain",
 							"type": { "text": "string | null" },
 							"description": "Space-separated list of field names (or ids as fallback) to retain after a successful form submission.",
@@ -54,14 +92,20 @@
 						{
 							"kind": "method",
 							"name": "saveFormState",
-							"description": "Serializes and persists the current form field values to localStorage.",
-							"privacy": "public"
+							"description": "Serializes and persists the current form field values, asynchronously when a script or hook is configured.",
+							"privacy": "public",
+							"return": {
+								"type": { "text": "void | Promise<void>" }
+							}
 						},
 						{
 							"kind": "method",
 							"name": "restoreFormState",
 							"description": "Applies previously saved field values to the current form.",
-							"privacy": "public"
+							"privacy": "public",
+							"return": {
+								"type": { "text": "void | Promise<void>" }
+							}
 						},
 						{
 							"kind": "method",
@@ -73,13 +117,19 @@
 					"events": [
 						{
 							"name": "form-saver-error",
-							"description": "Fired when localStorage cannot be read, written, or cleared.",
+							"description": "Fired when storage, module initialization, cleanup, or a transformation fails.",
 							"type": {
-								"text": "CustomEvent<{ operation: 'read' | 'write' | 'remove'; error: unknown }>"
+								"text": "CustomEvent<{ operation: 'read' | 'write' | 'remove' | 'initialize' | 'cleanup' | 'beforeSave' | 'beforeRestore'; error: unknown }>"
 							}
 						}
 					],
 					"attributes": [
+						{
+							"name": "script",
+							"type": { "text": "string" },
+							"description": "Application behavior module URL resolved against the document base URI. Only HTTP(S) URLs are accepted. Its optional initialize(element, { signal }) export may configure any behavior and return synchronous cleanup.",
+							"fieldName": "script"
+						},
 						{
 							"name": "retain",
 							"type": { "text": "string" },

@@ -14,7 +14,13 @@ describe('demo accessibility baseline', () => {
 		expect(css).toMatch(/\.demo\s*\{[^}]*color:\s*CanvasText/s);
 	});
 
-	it.each(['index.html', 'esm.html', 'unpkg.html'])(
+	it.each([
+		'index.html',
+		'esm.html',
+		'unpkg.html',
+		'encrypted.html',
+		'behavior.html',
+	])(
 		'%s has responsive code/live pairs and authored recovery feedback',
 		(file) => {
 			const html = read(`demo/${file}`);

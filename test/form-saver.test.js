@@ -207,6 +207,40 @@ describe('FormSaverElement', () => {
 			expect(form.elements.name.value).toBe('Original');
 			expect(form.elements.email.value).toBe('original@example.com');
 		});
+
+		it('scrubs identifiable stored passwords even when another native field is malformed', () => {
+			const key = `form-saver:post:${new URL('/mixed-draft', window.location.href).href}`;
+			localStorage.setItem(
+				key,
+				JSON.stringify({
+					username: [null, { type: 'text', value: 'Ada' }],
+					password: [{ type: 'password', value: 'old secret' }],
+					oldField: null,
+				}),
+			);
+			const { form } = setupFormSaver(`
+				<form action="/mixed-draft" method="post">
+					<input name="username" value="Original" />
+					<input type="password" name="password" value="" />
+				</form>
+			`);
+			expect(localStorage.getItem(key)).not.toContain('old secret');
+			expect(form.elements.password.value).toBe('');
+			expect(form.elements.username.value).toBe('Ada');
+		});
+
+		it('does not scrub password-shaped metadata inside an opaque payload', () => {
+			const key = `form-saver:post:${new URL('/opaque-draft', window.location.href).href}`;
+			const original = JSON.stringify({
+				wrapped: { message: [{ type: 'text', value: 'saved' }] },
+				metadata: [{ type: 'password', value: 'application metadata' }],
+			});
+			localStorage.setItem(key, original);
+			setupFormSaver(
+				'<form action="/opaque-draft" method="post"><input name="message" /></form>',
+			);
+			expect(localStorage.getItem(key)).toBe(original);
+		});
 	});
 
 	describe('Autosave', () => {

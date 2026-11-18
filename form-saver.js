@@ -8,7 +8,8 @@
  * @attr {string} retain-choice-label - Label text for the injected retention checkbox.
  * @attr {string} retain-choice-container - Optional selector for a container element into which the retention checkbox is placed.
  * @attr {string} storage-key - Optional explicit storage key override.
- * @fires form-saver-error - Fired when localStorage cannot be read, written, or cleared.
+ * @attr {string} script - Behavior module URL with an optional initialize(element, { signal }) export.
+ * @fires form-saver-error - Fired when storage, module initialization, cleanup, or a transformation fails.
  */
 export class FormSaverElement extends HTMLElement {
 	// ---- Static members ----
@@ -22,6 +23,7 @@ export class FormSaverElement extends HTMLElement {
 			'retain-choice-label',
 			'retain-choice-container',
 			'storage-key',
+			'script',
 		];
 	}
 
@@ -175,21 +177,57 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	static _saveToStorage(storage_key, payload) {
-		window.localStorage.setItem(storage_key, JSON.stringify(payload));
+		FormSaverElement._validatePayload(payload);
+		const serialized = JSON.stringify(payload);
+		if (serialized === undefined) {
+			throw new TypeError('The saved payload must be JSON-serializable.');
+		}
+		window.localStorage.setItem(storage_key, serialized);
 	}
 
-	static _readFromStorage(storage_key) {
+	static _validatePayload(value, ancestors = new Set()) {
+		if (
+			value === null ||
+			typeof value === 'string' ||
+			typeof value === 'boolean'
+		)
+			return;
+		if (typeof value === 'number' && Number.isFinite(value)) return;
+		if (
+			typeof value !== 'object' ||
+			ancestors.has(value) ||
+			(!Array.isArray(value) &&
+				![Object.prototype, null].includes(
+					Object.getPrototypeOf(value),
+				)) ||
+			Object.getOwnPropertySymbols(value).length > 0 ||
+			typeof value.toJSON === 'function'
+		) {
+			throw new TypeError(
+				'The saved payload must contain only JSON values.',
+			);
+		}
+		ancestors.add(value);
+		for (const item of Array.isArray(value)
+			? Array.from(value)
+			: Object.values(value)) {
+			FormSaverElement._validatePayload(item, ancestors);
+		}
+		ancestors.delete(value);
+	}
+
+	static _readFromStorage(storage_key, empty_value = null, strict = false) {
 		const value = window.localStorage.getItem(storage_key);
-		if (!value) {
-			return null;
+		if (value === null || (!strict && value === '')) {
+			return empty_value;
 		}
 
 		try {
 			return JSON.parse(value);
 		} catch (error) {
 			// Corrupted stored value; treat as empty.
-			if (error instanceof SyntaxError) {
-				return null;
+			if (error instanceof SyntaxError && !strict) {
+				return empty_value;
 			}
 
 			throw error;
@@ -198,6 +236,73 @@ export class FormSaverElement extends HTMLElement {
 
 	static _removeFromStorage(storage_key) {
 		window.localStorage.removeItem(storage_key);
+	}
+
+	static _validateRestoredState(state) {
+		const valid =
+			state !== null &&
+			typeof state === 'object' &&
+			!Array.isArray(state) &&
+			Object.values(state).every(
+				(values) =>
+					Array.isArray(values) &&
+					Array.from(values).every((value) => {
+						if (
+							!value ||
+							typeof value !== 'object' ||
+							Array.isArray(value) ||
+							typeof value.type !== 'string'
+						) {
+							return false;
+						}
+						if (value.type === 'select-multiple') {
+							return (
+								Array.isArray(value.values) &&
+								Array.from(value.values).every(
+									(item) => typeof item === 'string',
+								)
+							);
+						}
+						return (
+							typeof value.value === 'string' &&
+							(!['checkbox', 'radio'].includes(value.type) ||
+								typeof value.checked === 'boolean')
+						);
+					}),
+			);
+		if (!valid) {
+			throw new TypeError(
+				'Restoration requires a valid form state object.',
+			);
+		}
+	}
+
+	static _isNativeDraft(value) {
+		return (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.values(value).every(
+				(field) =>
+					field === null ||
+					(Array.isArray(field) &&
+						field.every(
+							(control) =>
+								control === null ||
+								(typeof control === 'object' &&
+									!Array.isArray(control) &&
+									typeof control.type === 'string'),
+						)),
+			) &&
+			Object.values(value).some(
+				(field) =>
+					Array.isArray(field) &&
+					field.some(
+						(control) =>
+							control && typeof control.type === 'string',
+					),
+			)
+		);
 	}
 
 	static _sanitizeStoredState(value) {
@@ -259,6 +364,14 @@ export class FormSaverElement extends HTMLElement {
 		super();
 		this._internals = {
 			initialized: false,
+			behaviorReady: null,
+			behaviorPending: false,
+			behaviorController: null,
+			behaviorCleanup: null,
+			beforeSave: null,
+			beforeRestore: null,
+			revision: 0,
+			connection: 0,
 			pendingSubmit: false,
 			form: null,
 			storageKey: null,
@@ -269,7 +382,12 @@ export class FormSaverElement extends HTMLElement {
 			boundSubmitHandler: (event) => this._handleSubmit(event),
 			boundPageHideHandler: () => this._handlePageHide(),
 			boundResetHandler: () => {
-				queueMicrotask(() => this.saveFormState());
+				this._cancelPendingSave();
+				const revision = ++this._internals.revision;
+				queueMicrotask(() => {
+					if (this._isCurrentOperation(revision))
+						this.saveFormState();
+				});
 			},
 		};
 	}
@@ -280,6 +398,9 @@ export class FormSaverElement extends HTMLElement {
 		this._upgradeProperty('retainChoiceLabel');
 		this._upgradeProperty('retainChoiceContainer');
 		this._upgradeProperty('storageKey');
+		this._upgradeProperty('script');
+		this._upgradeProperty('beforeSave');
+		this._upgradeProperty('beforeRestore');
 
 		queueMicrotask(() => {
 			this._initialize();
@@ -301,6 +422,8 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	disconnectedCallback() {
+		this._internals.revision++;
+		this._internals.connection++;
 		if (this._internals.domReadyHandler) {
 			document.removeEventListener(
 				'DOMContentLoaded',
@@ -320,6 +443,8 @@ export class FormSaverElement extends HTMLElement {
 		this._internals.storageKey = null;
 		this._internals.retainCheckbox = null;
 		this._internals.pendingSubmit = false;
+		this._internals.behaviorReady = null;
+		this._cancelBehavior();
 	}
 
 	attributeChangedCallback(name, old_value, new_value) {
@@ -337,6 +462,9 @@ export class FormSaverElement extends HTMLElement {
 				break;
 			case 'storage-key':
 				this._computeStorageKey();
+				break;
+			case 'script':
+				this._restartBehavior();
 				break;
 		}
 	}
@@ -421,9 +549,72 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	/**
+	 * Module URL with an optional initialize(element, { signal }) export.
+	 */
+	get script() {
+		return this.getAttribute('script');
+	}
+
+	set script(value) {
+		if (value === null || value === undefined || value === '') {
+			this.removeAttribute('script');
+			return;
+		}
+
+		this.setAttribute('script', String(value));
+	}
+
+	get beforeSave() {
+		return this._internals.beforeSave;
+	}
+
+	set beforeSave(value) {
+		this._setStorageHook('beforeSave', value);
+	}
+
+	get beforeRestore() {
+		return this._internals.beforeRestore;
+	}
+
+	set beforeRestore(value) {
+		this._setStorageHook('beforeRestore', value);
+	}
+
+	_setStorageHook(name, value) {
+		if (
+			value !== null &&
+			value !== undefined &&
+			typeof value !== 'function'
+		) {
+			throw new TypeError(`${name} must be a function or null.`);
+		}
+		if (this._internals[name] === (value ?? null)) return;
+		this._internals[name] = value ?? null;
+		if (!this._internals.behaviorPending) {
+			this._cancelPendingSave();
+			this._internals.revision++;
+		}
+	}
+
+	get _usesAsyncStorage() {
+		return Boolean(
+			this._internals.behaviorReady ||
+			this.beforeSave ||
+			this.beforeRestore,
+		);
+	}
+
+	loadModule(url) {
+		return import(new URL(url, this.baseURI).href);
+	}
+
+	/**
 	 * Clears persisted data for this form.
 	 */
 	clearSavedData() {
+		this._cancelPendingSave();
+		this._internals.revision++;
+		this._internals.pendingSubmit = false;
 		if (!this._internals.storageKey) {
 			return;
 		}
@@ -432,7 +623,7 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	/**
-	 * Immediately saves current form state into localStorage.
+	 * Saves current form state, asynchronously when a script or hook is configured.
 	 */
 	saveFormState() {
 		this._cancelPendingSave();
@@ -442,6 +633,10 @@ export class FormSaverElement extends HTMLElement {
 		}
 
 		const payload = FormSaverElement._serializeForm(this._internals.form);
+		const revision = ++this._internals.revision;
+		if (this._usesAsyncStorage) {
+			return this._saveTransformedState(payload, revision);
+		}
 		this._writeSavedState(payload);
 	}
 
@@ -449,8 +644,14 @@ export class FormSaverElement extends HTMLElement {
 	 * Restores form state from localStorage.
 	 */
 	restoreFormState() {
+		this._cancelPendingSave();
 		if (!this._internals.form || !this._internals.storageKey) {
 			return;
+		}
+
+		const revision = ++this._internals.revision;
+		if (this._usesAsyncStorage) {
+			return this._restoreTransformedState(revision);
 		}
 
 		const saved_state = this._readSavedState();
@@ -465,7 +666,7 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	_initialize() {
-		if (this._internals.initialized) {
+		if (this._internals.initialized || !this.isConnected) {
 			return;
 		}
 
@@ -478,8 +679,183 @@ export class FormSaverElement extends HTMLElement {
 		this._computeStorageKey();
 		this._addFormListeners();
 		this._renderRetentionControl();
-		this.restoreFormState();
 		this._internals.initialized = true;
+		this._startBehavior();
+		this.restoreFormState();
+	}
+
+	_restartBehavior() {
+		this._cancelPendingSave();
+		this._internals.revision++;
+		this._internals.connection++;
+		this._internals.behaviorReady = Promise.resolve(false);
+		this._cancelBehavior();
+		this._startBehavior();
+	}
+
+	_startBehavior() {
+		this._internals.behaviorReady = null;
+		if (this.hasAttribute('script')) {
+			const script = this.script;
+			const connection = this._internals.connection;
+			const controller = new AbortController();
+			this._internals.behaviorController = controller;
+			this._internals.behaviorPending = true;
+			this._internals.behaviorReady = Promise.resolve().then(() =>
+				this._loadBehaviorScript(script, connection, controller),
+			);
+		}
+	}
+
+	async _loadBehaviorScript(script, connection, controller) {
+		if (connection !== this._internals.connection) return false;
+		try {
+			const url = new URL(script, this.baseURI);
+			if (
+				!script?.trim() ||
+				!['http:', 'https:'].includes(url.protocol)
+			) {
+				throw new TypeError('Use an http or https module URL.');
+			}
+			const module = await this.loadModule(url.href);
+			if (connection !== this._internals.connection) return false;
+			if ('initialize' in module) {
+				if (typeof module.initialize !== 'function') {
+					throw new TypeError(
+						'The module initialize export must be a function.',
+					);
+				}
+				const cleanup = await module.initialize(this, {
+					signal: controller.signal,
+				});
+				if (cleanup !== undefined && typeof cleanup !== 'function') {
+					throw new TypeError(
+						'An initializer may return a cleanup function or undefined.',
+					);
+				}
+				if (
+					connection !== this._internals.connection ||
+					controller.signal.aborted
+				) {
+					if (cleanup) this._disposeBehavior(cleanup);
+					return false;
+				}
+				this._internals.behaviorCleanup = cleanup ?? null;
+			}
+			return true;
+		} catch (error) {
+			if (connection === this._internals.connection) {
+				this._cancelBehavior();
+				this._reportStorageError('initialize', error);
+			}
+			return false;
+		} finally {
+			if (connection === this._internals.connection) {
+				this._internals.behaviorPending = false;
+			}
+		}
+	}
+
+	_cancelBehavior() {
+		const controller = this._internals.behaviorController;
+		const cleanup = this._internals.behaviorCleanup;
+		this._internals.behaviorController = null;
+		this._internals.behaviorPending = false;
+		this._internals.behaviorCleanup = null;
+		this._internals.beforeSave = null;
+		this._internals.beforeRestore = null;
+		controller?.abort();
+		if (cleanup) this._disposeBehavior(cleanup);
+	}
+
+	_disposeBehavior(cleanup) {
+		try {
+			cleanup();
+		} catch (error) {
+			this._reportStorageError('cleanup', error);
+		}
+	}
+
+	_isCurrentOperation(revision) {
+		return (
+			this._internals.initialized && revision === this._internals.revision
+		);
+	}
+
+	async _saveTransformedState(state, revision) {
+		const ready = this._internals.behaviorReady;
+		if (ready && !(await ready)) return;
+		if (!this._isCurrentOperation(revision)) return;
+
+		try {
+			const payload = this.beforeSave
+				? await this.beforeSave(state)
+				: state;
+			if (!this._isCurrentOperation(revision)) return;
+			if (payload === undefined) {
+				throw new TypeError(
+					'beforeSave must return a JSON-serializable payload.',
+				);
+			}
+			this._writeSavedState(payload);
+		} catch (error) {
+			if (this._isCurrentOperation(revision)) {
+				this._reportStorageError('beforeSave', error);
+			}
+		}
+	}
+
+	async _restoreTransformedState(revision) {
+		const ready = this._internals.behaviorReady;
+		if (ready && !(await ready)) return;
+		if (!this._isCurrentOperation(revision)) return;
+
+		let payload;
+		const missing = Symbol();
+		try {
+			payload = FormSaverElement._readFromStorage(
+				this._internals.storageKey,
+				missing,
+				true,
+			);
+		} catch (error) {
+			this._reportStorageError('read', error);
+			return;
+		}
+		if (payload === missing) return;
+
+		try {
+			const beforeRestore = this.beforeRestore;
+			const restored = beforeRestore
+				? await beforeRestore.call(this, payload)
+				: payload;
+			if (!this._isCurrentOperation(revision)) return;
+			if (beforeRestore || !FormSaverElement._isNativeDraft(restored)) {
+				FormSaverElement._validateRestoredState(restored);
+			}
+			const { state, changed } =
+				FormSaverElement._sanitizeStoredState(restored);
+			if (changed) {
+				if (beforeRestore && !this.beforeSave) {
+					throw new TypeError(
+						'Sanitizing transformed storage requires a beforeSave callback; the original draft was preserved.',
+					);
+				}
+				if (state) await this._saveTransformedState(state, revision);
+				else this._removeSavedState();
+			}
+			if (state) FormSaverElement._validateRestoredState(state);
+			if (state && this._isCurrentOperation(revision)) {
+				FormSaverElement._applySerializedState(
+					this._internals.form,
+					state,
+				);
+			}
+		} catch (error) {
+			if (this._isCurrentOperation(revision)) {
+				this._reportStorageError('beforeRestore', error);
+			}
+		}
 	}
 
 	_addFormListeners() {
@@ -521,38 +897,36 @@ export class FormSaverElement extends HTMLElement {
 	}
 
 	_handlePageHide() {
-		this._flushPendingSave();
-
-		if (!this._internals.pendingSubmit || !this._internals.storageKey) {
+		if (this._internals.pendingSubmit && this._internals.storageKey) {
+			this._internals.pendingSubmit = false;
+			// Remove the full draft before starting asynchronous retention work.
+			this.clearSavedData();
+			const fields = this._retainedFieldNames;
+			if (fields.size > 0 && this._shouldRetainAfterSubmit()) {
+				const state = FormSaverElement._serializeForm(
+					this._internals.form,
+				);
+				const retained = Object.fromEntries(
+					Object.entries(state).filter(([name]) => fields.has(name)),
+				);
+				if (Object.keys(retained).length > 0) {
+					if (this._usesAsyncStorage) {
+						return this._saveTransformedState(
+							retained,
+							this._internals.revision,
+						);
+					}
+					this._writeSavedState(retained);
+				}
+			}
 			return;
 		}
 
-		const retained_fields = this._retainedFieldNames;
-		if (retained_fields.size > 0 && this._shouldRetainAfterSubmit()) {
-			const saved_state = this._readSavedState();
-			if (saved_state) {
-				const filtered_state = Object.fromEntries(
-					Object.entries(saved_state).filter(([field_name]) =>
-						retained_fields.has(field_name),
-					),
-				);
-
-				if (Object.keys(filtered_state).length > 0) {
-					this._writeSavedState(filtered_state);
-				} else {
-					this._removeSavedState();
-				}
-			} else {
-				this._removeSavedState();
-			}
-		} else {
-			this._removeSavedState();
-		}
-
-		this._internals.pendingSubmit = false;
+		this._flushPendingSave();
 	}
 
 	_scheduleSave() {
+		this._internals.revision++;
 		this._cancelPendingSave();
 		this._internals.autosaveTimer = window.setTimeout(() => {
 			this._internals.autosaveTimer = null;
@@ -583,9 +957,11 @@ export class FormSaverElement extends HTMLElement {
 			const stored_state = FormSaverElement._readFromStorage(
 				this._internals.storageKey,
 			);
+			if (stored_state === null) return null;
+			if (!FormSaverElement._isNativeDraft(stored_state))
+				FormSaverElement._validateRestoredState(stored_state);
 			const { state, changed } =
 				FormSaverElement._sanitizeStoredState(stored_state);
-
 			if (changed) {
 				if (state) {
 					this._writeSavedState(state);
@@ -593,6 +969,7 @@ export class FormSaverElement extends HTMLElement {
 					this._removeSavedState();
 				}
 			}
+			if (state) FormSaverElement._validateRestoredState(state);
 
 			return state;
 		} catch (error) {
@@ -719,6 +1096,8 @@ export class FormSaverElement extends HTMLElement {
 	 * the key from the form's method and action.
 	 */
 	_computeStorageKey() {
+		this._cancelPendingSave();
+		this._internals.revision++;
 		if (this.storageKey) {
 			this._internals.storageKey = this.storageKey;
 			return;
