@@ -105,9 +105,7 @@ async function serveDemo(
 	});
 }
 
-test('decorative links adapt to the color scheme and disappear for contrast and print', async ({
-	page,
-}) => {
+test('decorative links adapt to the color scheme', async ({ page }) => {
 	await serveDemo(page);
 	await page.goto('http://code-demo.test/demo/index.html');
 	for (const colorScheme of ['light', 'dark']) {
@@ -160,19 +158,24 @@ test('decorative links adapt to the color scheme and disappear for contrast and 
 			offsetRibbon: 255,
 		});
 	}
-	for (const media of [
-		{ contrast: 'more' },
-		{ contrast: 'no-preference', forcedColors: 'active' },
-		{ forcedColors: 'none', media: 'print' },
-	]) {
+});
+
+for (const [mode, media] of [
+	['more contrast', { contrast: 'more' }],
+	['forced colors', { forcedColors: 'active' }],
+	['print', { media: 'print' }],
+]) {
+	test(`${mode}: decorative links are hidden`, async ({ page }) => {
 		await page.emulateMedia(media);
+		await serveDemo(page);
+		await page.goto('http://code-demo.test/demo/index.html');
 		expect(
 			await page
 				.locator('body')
 				.evaluate((body) => getComputedStyle(body, '::before').display),
 		).toBe('none');
-	}
-});
+	});
+}
 
 test('reading sections inherit text color and leave their parent surface visible', async ({
 	page,
