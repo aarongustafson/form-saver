@@ -174,6 +174,7 @@ for (const [mode, media] of [
 				.locator('body')
 				.evaluate((body) => getComputedStyle(body, '::before').display),
 		).toBe('none');
+		await page.unrouteAll({ behavior: 'wait' });
 	});
 }
 
