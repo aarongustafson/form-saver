@@ -105,6 +105,127 @@ async function serveDemo(
 	});
 }
 
+test('decorative links adapt to the color scheme', async ({ page }) => {
+	await serveDemo(page);
+	await page.goto('http://code-demo.test/demo/index.html');
+	for (const colorScheme of ['light', 'dark']) {
+		await page.emulateMedia({ colorScheme });
+		const pattern = await page.locator('body').evaluate(async (body) => {
+			const style = getComputedStyle(body, '::before');
+			const mask = style.maskImage;
+			if (mask === 'none')
+				throw new Error('Missing decorative link mask.');
+			const image = new Image();
+			image.src = mask.slice(5, -2);
+			await image.decode();
+			const canvas = document.createElement('canvas');
+			canvas.width = image.naturalWidth;
+			canvas.height = image.naturalHeight;
+			const context = canvas.getContext('2d');
+			context.drawImage(image, 0, 0);
+			const alpha = (x, y) => context.getImageData(x, y, 1, 1).data[3];
+			const probe = document.createElement('span');
+			probe.style.color = 'CanvasText';
+			body.append(probe);
+			const canvasText = getComputedStyle(probe).color;
+			probe.remove();
+			return {
+				opacity: style.opacity,
+				color: style.backgroundColor,
+				canvasText,
+				image: style.backgroundImage,
+				pointerEvents: style.pointerEvents,
+				tile: style.maskSize,
+				width: image.naturalWidth,
+				height: image.naturalHeight,
+				hole: alpha(32, 24),
+				ribbon: alpha(12, 24),
+				offsetHole: alpha(91, 48),
+				offsetRibbon: alpha(71, 48),
+			};
+		});
+		expect(pattern).toMatchObject({
+			opacity: '0.02',
+			color: pattern.canvasText,
+			image: 'none',
+			pointerEvents: 'none',
+			tile: '88.5px 72px',
+			width: 118,
+			height: 96,
+			hole: 0,
+			ribbon: 255,
+			offsetHole: 0,
+			offsetRibbon: 255,
+		});
+	}
+});
+
+for (const [mode, media] of [
+	['more contrast', { contrast: 'more' }],
+	['forced colors', { forcedColors: 'active' }],
+	['print', { media: 'print' }],
+]) {
+	test(`${mode}: decorative links are hidden`, async ({ page }) => {
+		await page.emulateMedia(media);
+		await serveDemo(page);
+		await page.goto('http://code-demo.test/demo/index.html');
+		expect(
+			await page
+				.locator('body')
+				.evaluate((body) => getComputedStyle(body, '::before').display),
+		).toBe('none');
+		await page.unrouteAll({ behavior: 'wait' });
+	});
+}
+
+test('reading sections inherit text color and leave their parent surface visible', async ({
+	page,
+}) => {
+	const css = (
+		await Promise.all(
+			(await readdir(new URL('demo/', root)))
+				.filter((file) => file.endsWith('.css'))
+				.sort(
+					(a, b) =>
+						Number(a === 'demo-shell.css') -
+						Number(b === 'demo-shell.css'),
+				)
+				.map((file) => readFile(new URL(`demo/${file}`, root), 'utf8')),
+		)
+	).join('\n');
+	await page.setContent(`
+		<style>${css}</style>
+		<div id="reading-context" style="color: rgb(37, 71, 109); background: Canvas">
+			<section class="demo-section"><h2>Example</h2><p>Reading content.</p></section>
+			<aside class="api-reference"><h2>API</h2><p>Reference content.</p></aside>
+		</div>
+	`);
+	for (const media of [
+		{ colorScheme: 'light', media: 'screen' },
+		{ colorScheme: 'dark' },
+		{ media: 'print' },
+	]) {
+		await page.emulateMedia(media);
+		const parentColor = await page
+			.locator('#reading-context')
+			.evaluate((element) => getComputedStyle(element).color);
+		for (const selector of ['.demo-section', '.api-reference']) {
+			await expect(page.locator(selector)).toHaveCSS(
+				'color',
+				parentColor,
+			);
+			await expect(page.locator(selector)).toHaveCSS(
+				'background-image',
+				'none',
+			);
+			await expect(page.locator(selector)).toHaveCSS(
+				'background-color',
+				/^rgba\(\d+, \d+, \d+, 0\)$/,
+			);
+		}
+	}
+});
+
 const examples = [];
 for (const file of (await readdir(new URL('demo/', root)))
 	.filter((file) => file.endsWith('.html'))
@@ -117,6 +238,43 @@ for (const file of (await readdir(new URL('demo/', root)))
 	);
 	for (const language of languages) examples.push({ file, language });
 }
+
+test.describe('demo header spacing', () => {
+	test.use({ javaScriptEnabled: false });
+
+	for (const file of new Set(examples.map((example) => example.file))) {
+		test(`${file}: content clears the header border without JavaScript`, async ({
+			page,
+		}) => {
+			await serveDemo(page);
+			await page.goto(`http://code-demo.test/demo/${file}`);
+			for (const width of [320, 1400]) {
+				await page.setViewportSize({ width, height: 900 });
+				const gap = await page.locator('main').evaluate((main) => {
+					const header = document.querySelector('body > header');
+					const walker = document.createTreeWalker(
+						main,
+						NodeFilter.SHOW_TEXT,
+					);
+					let text;
+					while ((text = walker.nextNode())) {
+						if (!text.textContent.trim()) continue;
+						const range = document.createRange();
+						range.selectNodeContents(text);
+						const rect = range.getBoundingClientRect();
+						if (rect.width && rect.height) {
+							return (
+								rect.top - header.getBoundingClientRect().bottom
+							);
+						}
+					}
+					throw new Error('Demo has no visible main content.');
+				});
+				expect(gap, `${file} at ${width}px`).toBeGreaterThanOrEqual(32);
+			}
+		});
+	}
+});
 
 for (const { file, language } of examples) {
 	test(`${file}: ${language} highlighting preserves text and keyboard Copy includes the complete snippet`, async ({
