@@ -66,8 +66,6 @@ footer {
 	margin-trim: block;
 	margin-block: 2rem;
 	padding: 1.5rem;
-	background: Canvas;
-	color: CanvasText;
 	border: 1px solid ButtonBorder;
 	border-radius: 0.5rem;
 }
