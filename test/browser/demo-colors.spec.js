@@ -562,6 +562,43 @@ for (const preference of ['more-contrast', 'forced-colors']) {
 	});
 }
 
+for (const topLayer of ['popover', 'dialog']) {
+	test(`native focus ignores clipping outside an open ${topLayer}`, async ({
+		page,
+	}) => {
+		await page.setContent(`
+			<div style="overflow: hidden; width: 1px; height: 1px">
+				<${topLayer === 'dialog' ? 'dialog' : 'div popover'} id="popup">
+					<button>Visible control</button>
+				</${topLayer === 'dialog' ? 'dialog' : 'div'}>
+			</div>
+		`);
+		await page.locator('#popup').evaluate((popup) => {
+			if (popup.localName === 'dialog') popup.showModal();
+			else popup.showPopover();
+		});
+		await page.keyboard.press('Tab');
+		await expectNativeFocus(page.locator('button'));
+	});
+}
+
+test('native focus still detects clipping inside an open popover', async ({
+	page,
+}) => {
+	await page.setContent(`
+		<div popover id="popup">
+			<div style="overflow: hidden; width: 1px; height: 1px">
+				<button>Clipped control</button>
+			</div>
+		</div>
+	`);
+	await page.locator('#popup').evaluate((popup) => popup.showPopover());
+	await page.keyboard.press('Tab');
+	await expect(expectNativeFocus(page.locator('button'))).rejects.toThrow(
+		'Ancestors must leave room for the native focus ring',
+	);
+});
+
 test('note and live-demo controls preserve native keyboard focus', async ({
 	page,
 	browserName,
@@ -632,8 +669,47 @@ test('code/live examples stack without horizontal page overflow', async ({
 	).toBeLessThanOrEqual(320);
 });
 
+async function hasAuthoredFallback(demos) {
+	return demos.evaluateAll((elements) =>
+		elements.some(
+			(element) =>
+				Boolean(element.textContent.trim()) ||
+				[...element.querySelectorAll('img[alt]')].some(
+					(image) =>
+						image.getAttribute('alt').trim() &&
+						image.getClientRects().length > 0,
+				),
+		),
+	);
+}
+
 test.describe('authored demo without JavaScript', () => {
 	test.use({ javaScriptEnabled: false });
+
+	test('native fallback may follow an enhancement-only example', async ({
+		page,
+	}) => {
+		await page.setContent(`
+			<div class="demo">
+				<example-image src="image.jpg" alt="Requires enhancement"></example-image>
+			</div>
+			<div class="demo">
+				<img alt="Useful native fallback" width="200" height="20">
+			</div>
+		`);
+		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(true);
+	});
+
+	test('native fallback rejects empty, decorative, and hidden images', async ({
+		page,
+	}) => {
+		await page.setContent(`
+			<div class="demo"><example-image src="image.jpg"></example-image></div>
+			<div class="demo"><img alt="" width="20" height="20"></div>
+			<div class="demo"><img alt="Hidden fallback" width="200" height="20" hidden></div>
+		`);
+		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(false);
+	});
 
 	test('keeps fallback content and code/live pairs usable', async ({
 		page,
@@ -650,18 +726,7 @@ test.describe('authored demo without JavaScript', () => {
 		].length;
 		expect(authoredPairs).toBeGreaterThan(0);
 		await expect(pairs).toHaveCount(authoredPairs);
-		const hasFallback = await page
-			.locator('.demo')
-			.first()
-			.evaluate(
-				(element) =>
-					Boolean(element.textContent.trim()) ||
-					[...element.querySelectorAll('img[alt]')].some(
-						(image) =>
-							image.getAttribute('alt').trim() &&
-							image.getClientRects().length > 0,
-					),
-			);
+		const hasFallback = await hasAuthoredFallback(page.locator('.demo'));
 		expect(hasFallback).toBe(true);
 		for (const width of [1000, 320]) {
 			await page.setViewportSize({ width, height: 800 });

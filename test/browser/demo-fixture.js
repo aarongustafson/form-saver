@@ -39,9 +39,12 @@ export async function expectNativeFocus(control) {
 		const ring = element.getBoundingClientRect();
 		const parent = (node) =>
 			node.assignedSlot || node.parentElement || node.getRootNode().host;
+		const inTopLayer = (node) =>
+			node.matches(':popover-open, :modal') ||
+			node === node.ownerDocument.fullscreenElement;
 		const clips = [];
 		for (
-			let ancestor = parent(element);
+			let ancestor = inTopLayer(element) ? null : parent(element);
 			ancestor;
 			ancestor = parent(ancestor)
 		) {
@@ -60,6 +63,7 @@ export async function expectNativeFocus(control) {
 			if (clipsX || clipsY) {
 				clips.push(`${ancestor.localName}.${ancestor.className}`);
 			}
+			if (inTopLayer(ancestor)) break;
 		}
 		return clips;
 	});
