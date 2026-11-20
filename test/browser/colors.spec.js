@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
+import { expectNativeFocus, readDemoStyles } from './demo-fixture.js';
 
 test.beforeEach(async ({ page }) => {
 	await page.route(
@@ -10,9 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 const read = (file) =>
 	readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
-const css = (
-	await Promise.all(['demo/styles.css', 'demo/demo-shell.css'].map(read))
-).join('\n');
+const css = await readDemoStyles();
 const source = await read('form-saver.js');
 const definition = await read('define.js');
 const tokens = [
@@ -294,15 +293,7 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 			await page.keyboard.press('Tab');
 		}
 		await expect(name).toBeFocused();
-		expect(
-			await name.evaluate((element) => {
-				const style = getComputedStyle(element);
-				return (
-					style.outlineStyle !== 'none' &&
-					parseFloat(style.outlineWidth) > 0
-				);
-			}),
-		).toBe(true);
+		await expectNativeFocus(name);
 		await name.fill('Invented demo name');
 		await expect
 			.poll(() =>
@@ -332,18 +323,38 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		await expect(name).toHaveValue('Still entered');
 		await expect(name).toBeFocused();
 		const pair = page.locator('.code-demo-pair').first();
-		const codeBox = await pair.locator('pre').boundingBox();
-		const liveBox = await pair.locator('.demo').boundingBox();
-		expect(codeBox.x).toBeLessThan(liveBox.x);
+		await expect
+			.poll(() =>
+				pair.evaluate((element) => {
+					const code = element
+						.querySelector(':scope > micro-lighter')
+						.getBoundingClientRect();
+					const live = element
+						.querySelector(':scope > .demo')
+						.getBoundingClientRect();
+					return code.right <= live.left + 1;
+				}),
+			)
+			.toBe(true);
 		await page.setViewportSize({ width: 320, height: 900 });
 		expect(
 			await page.evaluate(
 				() => document.documentElement.scrollWidth <= innerWidth,
 			),
 		).toBe(true);
-		expect((await pair.locator('pre').boundingBox()).y).toBeLessThan(
-			(await pair.locator('.demo').boundingBox()).y,
-		);
+		await expect
+			.poll(() =>
+				pair.evaluate((element) => {
+					const code = element
+						.querySelector(':scope > micro-lighter')
+						.getBoundingClientRect();
+					const live = element
+						.querySelector(':scope > .demo')
+						.getBoundingClientRect();
+					return code.bottom <= live.top + 1;
+				}),
+			)
+			.toBe(true);
 		await page.evaluate(() => {
 			document.documentElement.style.fontSize = '200%';
 		});

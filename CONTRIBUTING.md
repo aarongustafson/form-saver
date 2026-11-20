@@ -77,6 +77,8 @@ Run `npm run format` before committing to ensure consistent formatting.
 
 ## Documentation
 
+Read [the demo editing guide](demo/README.md) before changing demo assets or tests.
+
 - Update README.md if you change functionality
 - Add JSDoc comments to new public APIs
 - Update custom-elements.json if you add/change attributes, events, or properties
