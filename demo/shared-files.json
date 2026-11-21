@@ -1,0 +1,16 @@
+[
+	".github/instructions/demo.instructions.md",
+	"demo/README.md",
+	"demo/shared-files.json",
+	"demo/demo-shell.css",
+	"demo/code-examples.js",
+	"test/demo-layout.test.js",
+	"test/demo-enhancement.test.js",
+	"test/demo-mark.test.js",
+	"test/demo-ownership.test.js",
+	"test/demo-shared.test.js",
+	"scripts/check-demo-shared.js",
+	"test/browser/demo-fixture.js",
+	"test/browser/code-examples.spec.js",
+	"test/browser/demo-colors.spec.js"
+]

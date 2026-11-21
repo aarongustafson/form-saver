@@ -1,12 +1,23 @@
+// Shared demo file. Change the starter source, not a component's copy.
 const status = document.getElementById('microlighter-status');
+if (!status) throw new Error('Missing demo enhancement status element.');
+const messages = {
+	loading: status.dataset.loadingMessage,
+	failure: status.dataset.failureMessage,
+	themeFailure: status.dataset.themeFailureMessage,
+};
+for (const [name, message] of Object.entries(messages)) {
+	if (!message?.trim()) {
+		throw new Error(`Missing authored demo enhancement message: ${name}`);
+	}
+}
 status.hidden = false;
-status.textContent = 'Loading optional code highlighting and Copy controls.';
+status.textContent = messages.loading;
 
 function reportFailure(error) {
 	console.error('MicroLighter could not load:', error);
 	status.hidden = false;
-	status.textContent =
-		'MicroLighter could not load. Code remains readable and selectable; the component loads independently.';
+	status.textContent = messages.failure;
 }
 
 try {
@@ -18,8 +29,7 @@ try {
 	let enhanced = false;
 	function reportThemeFailure() {
 		status.hidden = false;
-		status.textContent =
-			'Code highlighting and Copy controls are available, but the syntax theme could not load. The component loads independently.';
+		status.textContent = messages.themeFailure;
 	}
 	const theme = document.createElement('link');
 	theme.rel = 'stylesheet';

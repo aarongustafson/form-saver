@@ -1,107 +1,121 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
+import {
+	expectNativeFocus,
+	expectPairLayout,
+	readDemoStyles,
+	serveDemo,
+} from './demo-fixture.js';
 
 const root = new URL('../../', import.meta.url);
-const distribution = new URL('node_modules/microlighter/dist/', root);
-const cdn = 'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/';
 
-async function serveDemo(
-	page,
-	{
-		grammarFailure = false,
-		stalledTheme = false,
-		themeFailure = false,
-		distinctFields = false,
-		translucentFields = false,
-	} = {},
-) {
-	await page.addInitScript(() => {
-		Object.defineProperty(navigator, 'clipboard', {
-			configurable: true,
-			value: {
-				writeText: async (text) => {
-					window.copiedSnippet = text;
-				},
-			},
-		});
+for (const [name, html] of [
+	[
+		'reordered attributes',
+		'<link href="styles.css" rel="stylesheet"><link href="demo-shell.css" rel="stylesheet">',
+	],
+	[
+		'single-quoted attributes',
+		"<link rel='stylesheet' href='styles.css'><link rel='stylesheet' href='demo-shell.css'>",
+	],
+]) {
+	test(`stylesheet extraction preserves order with ${name}`, async () => {
+		const expected = await Promise.all(
+			['styles.css', 'demo-shell.css'].map((file) =>
+				readFile(new URL(`demo/${file}`, root), 'utf8'),
+			),
+		);
+		expect(await readDemoStyles('index.html', html)).toBe(
+			expected.join('\n'),
+		);
 	});
-	await page.route('**/*', async (route) => {
-		const url = new URL(route.request().url());
-		let file;
-		if (url.href.startsWith(cdn)) {
-			if (stalledTheme && url.pathname.endsWith('.css')) return;
-			if (themeFailure && url.pathname.endsWith('.css'))
-				return route.abort();
-			if (grammarFailure && url.pathname.endsWith('/grammars/html.js'))
-				return route.abort();
-			if (url.pathname.endsWith('/micro-lighter-element.min.js')) {
-				await page.locator('micro-lighter').evaluateAll((panels) => {
-					panels[0].setAttribute('data-syntax-theme', 'github');
-					for (const panel of panels)
-						panel.dataset.authoredSnippet =
-							panel.querySelector('code').textContent;
-				});
-			}
-			file = new URL(url.href.slice(cdn.length), distribution);
-		} else if (url.origin === 'http://code-demo.test') {
-			if (url.pathname.split('/').some((part) => part.startsWith('.')))
-				return route.abort();
-			file = new URL(`.${url.pathname}`, root);
-		} else {
-			return route.abort();
+}
+
+for (const colorScheme of ['light', 'dark']) {
+	test(`${colorScheme}: header stays transparent and navigation links use their native minimum size`, async ({
+		page,
+	}) => {
+		await page.emulateMedia({ colorScheme });
+		await serveDemo(page);
+		await page.goto('http://code-demo.test/demo/index.html');
+		await expect(page.locator('body > header')).toHaveCSS(
+			'background-color',
+			'rgba(0, 0, 0, 0)',
+		);
+		const minimum = await page
+			.locator('header nav a')
+			.first()
+			.evaluate((link) => {
+				const actual = getComputedStyle(link).minBlockSize;
+				const original = link.getAttribute('style');
+				link.style.minBlockSize = 'revert';
+				const native = getComputedStyle(link).minBlockSize;
+				if (original === null) link.removeAttribute('style');
+				else link.setAttribute('style', original);
+				return { actual, native };
+			});
+		expect(minimum.actual).toBe(minimum.native);
+	});
+
+	test(`${colorScheme}: shared demo controls retain unclipped browser-native keyboard focus`, async ({
+		page,
+		browserName,
+	}) => {
+		await page.emulateMedia({ colorScheme });
+		await serveDemo(page);
+		await page.goto('http://code-demo.test/demo/index.html');
+		await page.keyboard.press(
+			browserName === 'webkit' && process.platform === 'darwin'
+				? 'Alt+Tab'
+				: 'Tab',
+		);
+		await expect(page.locator('.skip-link')).toBeFocused();
+		for (const control of [
+			page.locator('.skip-link'),
+			page.locator('header a').first(),
+			page.locator('micro-lighter pre').first(),
+			page.locator('micro-lighter').first().getByRole('button'),
+		]) {
+			await expectNativeFocus(control);
 		}
-		let body;
-		try {
-			body = await readFile(file);
-		} catch (error) {
-			if (error.code === 'ENOENT' || error.code === 'EISDIR')
-				return route.abort();
-			throw error;
-		}
-		const extension = file.pathname.split('.').at(-1);
-		if (extension === 'html' && url.pathname === '/demo/index.html') {
-			// Older pilot demos also need an authored-mark upgrade fixture.
-			body = body
-				.toString()
-				.replace(
-					/(<pre\b[^>]*>\s*<code>)([\s\S]*?)(<\/code>)/,
-					(match, start, code, end) =>
-						code.includes('<mark>')
-							? match
-							: `${start}<mark>${code}</mark>${end}`,
-				);
-		}
-		if (
-			(distinctFields || translucentFields) &&
-			extension === 'css' &&
-			!url.href.startsWith(cdn)
-		) {
-			body = body
-				.toString()
-				.replace(
-					/\bFieldText\b/g,
-					translucentFields ? '#ffffffd8' : 'rgb(255, 255, 0)',
-				)
-				.replace(
-					/\bField\b/g,
-					translucentFields ? '#ffffff3f' : 'rgb(20, 30, 40)',
-				);
-			if (translucentFields)
-				body = body
-					.replace(/\bCanvasText\b/g, '#ffffff')
-					.replace(/\bCanvas\b/g, '#1e1e1e');
-		}
-		await route.fulfill({
-			body,
-			contentType:
-				{
-					html: 'text/html',
-					js: 'text/javascript',
-					css: 'text/css',
-					json: 'application/json',
-					svg: 'image/svg+xml',
-				}[extension] ?? 'application/octet-stream',
+		await expect(page.locator('.code-panel').first()).toHaveCSS(
+			'outline-style',
+			'none',
+		);
+	});
+}
+
+for (const mode of ['light', 'dark', 'forced colors']) {
+	test(`${mode}: notes use a neutral Canvas surface with a left border`, async ({
+		page,
+	}) => {
+		await page.emulateMedia({
+			colorScheme: mode === 'dark' ? 'dark' : 'light',
+			forcedColors: mode === 'forced colors' ? 'active' : 'none',
 		});
+		const css = await readDemoStyles();
+		await page.setContent(`
+			<style>${css}</style>
+			<div class="demo-section">
+				<aside class="note">Helpful context with <code>inline code</code>.</aside>
+			</div>
+			<span id="canvas" style="background: Canvas; color: CanvasText">Reference</span>
+		`);
+		const canvas = await page.locator('#canvas').evaluate((element) => {
+			const style = getComputedStyle(element);
+			return { background: style.backgroundColor, color: style.color };
+		});
+		const note = page.locator('.note');
+		await expect(note).toHaveCSS('background-color', canvas.background);
+		await expect(note).toHaveCSS('background-image', 'none');
+		await expect(note).toHaveCSS('color', canvas.color);
+		await expect(note).toHaveCSS('border-left-width', '4px');
+		await expect(note).toHaveCSS('border-left-style', 'solid');
+		await expect(note.locator('code')).toHaveCSS('color', canvas.color);
+		await expect(note.locator('code')).toHaveCSS(
+			'background-color',
+			/^rgba\(\d+, \d+, \d+, 0\)$/,
+		);
 	});
 }
 
@@ -181,18 +195,7 @@ for (const [mode, media] of [
 test('reading sections inherit text color and leave their parent surface visible', async ({
 	page,
 }) => {
-	const css = (
-		await Promise.all(
-			(await readdir(new URL('demo/', root)))
-				.filter((file) => file.endsWith('.css'))
-				.sort(
-					(a, b) =>
-						Number(a === 'demo-shell.css') -
-						Number(b === 'demo-shell.css'),
-				)
-				.map((file) => readFile(new URL(`demo/${file}`, root), 'utf8')),
-		)
-	).join('\n');
+	const css = await readDemoStyles();
 	await page.setContent(`
 		<style>${css}</style>
 		<div id="reading-context" style="color: rgb(37, 71, 109); background: Canvas">
@@ -227,9 +230,13 @@ test('reading sections inherit text color and leave their parent surface visible
 });
 
 const examples = [];
-for (const file of (await readdir(new URL('demo/', root)))
-	.filter((file) => file.endsWith('.html'))
-	.sort()) {
+const pages = JSON.parse(
+	await readFile(new URL('demo/pages.json', root), 'utf8'),
+);
+const fullPages = Object.keys(pages)
+	.filter((file) => pages[file] === 'full')
+	.sort();
+for (const file of fullPages) {
 	const html = await readFile(new URL(`demo/${file}`, root), 'utf8');
 	const languages = new Set(
 		[...html.matchAll(/<micro-lighter\b[^>]*\blanguage="([^"]+)"/g)].map(
@@ -242,7 +249,7 @@ for (const file of (await readdir(new URL('demo/', root)))
 test.describe('demo header spacing', () => {
 	test.use({ javaScriptEnabled: false });
 
-	for (const file of new Set(examples.map((example) => example.file))) {
+	for (const file of fullPages) {
 		test(`${file}: content clears the header border without JavaScript`, async ({
 			page,
 		}) => {
@@ -272,7 +279,54 @@ test.describe('demo header spacing', () => {
 				});
 				expect(gap, `${file} at ${width}px`).toBeGreaterThanOrEqual(32);
 			}
+			await expect(
+				page.locator('micro-lighter code mark').first(),
+			).toBeVisible();
+			await expect(page.locator('#microlighter-status')).toBeHidden();
 		});
+	}
+});
+
+for (const file of fullPages) {
+	test(`${file}: code pages and live pairs reflow without horizontal page overflow`, async ({
+		page,
+	}) => {
+		await serveDemo(page);
+		await page.goto(`http://code-demo.test/demo/${file}`);
+		await expect(page.locator('#microlighter-status')).toBeHidden();
+		for (const width of [320, 1400]) {
+			await page.setViewportSize({ width, height: 900 });
+			await expect
+				.poll(
+					() =>
+						page.evaluate(
+							() =>
+								document.documentElement.scrollWidth <=
+								window.innerWidth,
+						),
+					{ message: `${file} at ${width}px` },
+				)
+				.toBe(true);
+			const pair = page.locator('.code-demo-pair').first();
+			if (await pair.count()) {
+				await expectPairLayout(pair, width);
+			}
+		}
+	});
+}
+
+test('intentionally stacked pairs reflow at wide and narrow widths', async ({
+	page,
+}) => {
+	await page.setContent(`
+		<style>
+			.code-demo-pair { display: grid; grid-template-columns: 1fr; }
+		</style>
+		<div class="code-demo-pair"><pre>Code</pre><div class="demo">Live example</div></div>
+	`);
+	for (const width of [320, 1400]) {
+		await page.setViewportSize({ width, height: 900 });
+		await expectPairLayout(page.locator('.code-demo-pair'), width);
 	}
 });
 
@@ -335,11 +389,19 @@ for (const { file, language } of examples) {
 test('a failed optional theme reports only the missing theme while enhancement remains available', async ({
 	page,
 }) => {
-	await serveDemo(page, { themeFailure: true });
+	await serveDemo(page, {
+		themeFailure: true,
+		transformHtml: (html) =>
+			html.replace(
+				/data-theme-failure-message="[^"]+"/,
+				'data-theme-failure-message="No se pudo cargar el tema de sintaxis."',
+			),
+	});
 	await page.goto('http://code-demo.test/demo/index.html');
-	await expect(page.locator('#microlighter-status')).toContainText(
-		'Code highlighting and Copy controls are available, but the syntax theme could not load.',
-	);
+	const status = page.locator('#microlighter-status');
+	const message = await status.getAttribute('data-theme-failure-message');
+	expect(message?.trim()).toBeTruthy();
+	await expect(status).toHaveText(message);
 	await expect(
 		page
 			.locator('micro-lighter')
@@ -351,14 +413,22 @@ test('a failed optional theme reports only the missing theme while enhancement r
 test('a failed grammar retains authored marks and reports the partial failure', async ({
 	page,
 }) => {
-	await serveDemo(page, { grammarFailure: true });
+	await serveDemo(page, {
+		grammarFailure: true,
+		transformHtml: (html) =>
+			html.replace(
+				/data-failure-message="[^"]+"/,
+				'data-failure-message="El ejemplo sigue disponible sin resaltado."',
+			),
+	});
 	await page.goto('http://code-demo.test/demo/index.html');
 	const code = page
 		.locator('micro-lighter[language="html"] code:has(mark)')
 		.first();
-	await expect(page.locator('#microlighter-status')).toContainText(
-		'Code remains readable and selectable',
-	);
+	const status = page.locator('#microlighter-status');
+	const message = await status.getAttribute('data-failure-message');
+	expect(message?.trim()).toBeTruthy();
+	await expect(status).toHaveText(message);
 	await expect(code.locator('mark').first()).toBeVisible();
 	await expect
 		.poll(() =>

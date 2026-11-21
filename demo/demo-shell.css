@@ -1,3 +1,12 @@
+/* Shared demo file. Change the starter source, not a component's copy. */
+@font-face {
+	font-family: 'system-monospace';
+	src:
+		local('SFMono-Regular'), local('Menlo'), local('Monaco'),
+		local('Consolas'), local('Liberation Mono'), local('Courier New'),
+		local('monospace');
+}
+
 [data-syntax-theme] {
 	color-scheme: inherit;
 }
@@ -12,7 +21,7 @@
 	box-sizing: border-box;
 }
 
-body {
+body[data-demo-page='full'] {
 	font-family: system-ui, sans-serif;
 	line-height: 1.6;
 	color: var(--page-color, CanvasText);
@@ -24,7 +33,7 @@ body {
 	overflow-wrap: anywhere;
 }
 
-body::before {
+body[data-demo-page='full']::before {
 	content: '';
 	position: fixed;
 	inset: 0;
@@ -54,9 +63,15 @@ body::before {
 .skip-link:focus {
 	transform: none;
 }
-:focus-visible {
-	outline: 3px solid CanvasText;
-	outline-offset: 4px;
+.visibly-hidden {
+	border: 0;
+	clip: rect(0 0 0 0);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
 }
 
 h1,
@@ -95,11 +110,10 @@ a:active {
 a:visited {
 	color: VisitedText;
 }
-body > header {
+body[data-demo-page='full'] > header {
 	margin-block-end: 2.5rem;
 	padding-block: 2rem 3rem;
 	border-block-end: 2px solid var(--rule);
-	background: Canvas;
 }
 .eyebrow {
 	font:
@@ -120,15 +134,14 @@ body > header {
 	max-inline-size: 65ch;
 	margin-block: 1rem 1.5rem;
 }
-body > header nav {
+body[data-demo-page='full'] > header nav {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.5rem 1.25rem;
 }
-body > header nav a {
+body[data-demo-page='full'] > header nav a {
 	display: inline-flex;
 	align-items: center;
-	min-block-size: 2.75rem;
 	text-underline-offset: 0.2em;
 	font-weight: 650;
 }
@@ -156,7 +169,7 @@ summary {
 	border-inline-start: 3px solid currentColor;
 	padding-inline-start: 1rem;
 }
-body > footer {
+body[data-demo-page='full'] > footer {
 	margin-block-start: 4rem;
 	padding-block-start: 2rem;
 	border-block-start: 1px solid CanvasText;
@@ -178,6 +191,15 @@ body > footer {
 .demo-section > p,
 .api-reference > p {
 	max-inline-size: 80ch;
+}
+
+.demo-section > p {
+	margin-block-end: 1rem;
+}
+
+.demo-section > p code {
+	background: transparent;
+	color: inherit;
 }
 
 .code-demo-pair {
@@ -203,6 +225,12 @@ samp {
 	font-family: system-monospace, monospace;
 	font-size: 0.9em;
 }
+code {
+	background-color: Canvas;
+	color: CanvasText;
+	padding: 0.125rem 0.25rem;
+	border-radius: 3px;
+}
 pre,
 .event-log {
 	background-color: Canvas;
@@ -223,6 +251,13 @@ pre code {
 	color: inherit;
 	font-size: inherit;
 }
+pre code mark {
+	background: Mark;
+	color: MarkText;
+	border-radius: 2px;
+	padding: 0.125rem 0.25rem;
+	font-weight: 600;
+}
 .demo {
 	background: Canvas;
 	color: CanvasText;
@@ -231,7 +266,7 @@ pre code {
 	border-radius: 0.75rem;
 }
 .demo::before {
-	content: 'Live example';
+	content: attr(data-demo-label);
 	display: block;
 	grid-column: 1 / -1;
 	font:
@@ -250,13 +285,8 @@ micro-lighter {
 .code-panel {
 	border: 1px solid var(--rule);
 	border-radius: 0.75rem;
-	overflow: clip;
 	background: var(--syntax-background, Canvas);
 	color: var(--syntax-foreground, CanvasText);
-}
-.code-panel:focus-within {
-	outline: 3px solid CanvasText;
-	outline-offset: 4px;
 }
 micro-lighter::before {
 	content: attr(data-label);
@@ -282,7 +312,7 @@ micro-lighter pre {
 	line-height: 1.5;
 	min-inline-size: 0;
 	max-inline-size: 100%;
-	border-radius: 0;
+	border-radius: inherit;
 }
 micro-lighter::part(copy-button) {
 	min-inline-size: 2.75rem;
@@ -292,6 +322,10 @@ micro-lighter::part(copy-button) {
 		600 0.8rem / 1.4 system-ui,
 		sans-serif;
 	border-color: var(--syntax-foreground, CanvasText);
+}
+micro-lighter::part(copy-button):focus-visible {
+	outline: revert;
+	outline-offset: revert;
 }
 micro-lighter::part(line-numbers) {
 	color: var(--syntax-foreground, CanvasText);
@@ -304,13 +338,154 @@ h1 code {
 	font: inherit;
 }
 
-.demo-section > :focus-visible,
-.demo-section > p :focus-visible {
-	outline-color: CanvasText;
+@layer demo-controls {
+	legend,
+	label {
+		font-weight: bold;
+		display: block;
+		margin-block: 1rem;
+	}
+
+	label:has(+ input),
+	label:has(+ select),
+	label:has(+ textarea) {
+		margin-block-end: 0;
+	}
+
+	fieldset {
+		margin-block: 1rem;
+		border: 0;
+		padding: 0;
+	}
+
+	legend {
+		margin-block: 0;
+		padding: 0;
+	}
+
+	fieldset > label {
+		font-weight: normal;
+		margin-block: 0.25rem;
+		min-height: 23px;
+	}
+
+	input:not(
+		[type='checkbox'],
+		[type='radio'],
+		[type='submit'],
+		[type='reset']
+	),
+	select,
+	textarea {
+		display: block;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid currentColor;
+		border-radius: 4px;
+		font-size: 1rem;
+		font-family: inherit;
+		width: 100%;
+		max-width: 400px;
+		background-color: Canvas;
+		background-image: linear-gradient(Field, Field);
+		color: FieldText;
+	}
+
+	button[type='submit'],
+	button[type='reset'] {
+		background: ButtonFace;
+		color: ButtonText;
+		border: 1px solid currentColor;
+		padding: 0.75rem 1.5rem;
+		border-radius: 4px;
+		font-size: 1rem;
+		font-weight: bold;
+		cursor: pointer;
+		margin-block-start: 1rem;
+		margin-inline-end: 0.5rem;
+	}
+
+	button[type='submit']:hover,
+	button[type='reset']:hover {
+		text-decoration: underline;
+	}
+
+	@supports (
+		background-color: color-mix(in srgb, ButtonFace 95%, ButtonText)
+	) {
+		button[type='submit']:hover,
+		button[type='reset']:hover {
+			background-color: color-mix(in srgb, ButtonFace 95%, ButtonText);
+			text-decoration: none;
+		}
+	}
+}
+
+small {
+	display: block;
+	font-style: italic;
+	font-weight: normal;
+	margin-block: 0.5rem 1rem;
+	color: inherit;
+}
+
+:where(body, .demo, .api-reference) > small {
+	color: CanvasText;
+	color: color-mix(in srgb, CanvasText 80%, Canvas);
+}
+
+.other-radio,
+.other-checkbox {
+	display: flex;
+	margin-block: 0.25rem;
+	min-height: 23px;
+	align-items: flex-start;
+}
+
+.other-radio label,
+.other-checkbox label {
+	font-weight: normal;
+	margin-block: 0;
+	margin-inline-end: 0.5rem;
+}
+
+.other-radio label + *,
+.other-checkbox label + * {
+	flex: 1;
+}
+
+.note {
+	background: Canvas;
+	color: CanvasText;
+	border-left: 4px solid AccentColor;
+	padding: 1rem;
+	margin-block: 1rem;
+	border-radius: 4px;
+}
+
+.note code {
+	background: transparent;
+	color: inherit;
+}
+
+.note a {
+	color: inherit;
+}
+
+.note strong {
+	display: block;
+	margin-block-end: 0.5rem;
+}
+
+.api-reference p {
+	margin: 0;
+}
+
+.api-reference a {
+	color: inherit;
 }
 
 @media (max-width: 600px) {
-	body {
+	body[data-demo-page='full'] {
 		padding: 1rem;
 	}
 	.demo,
@@ -366,8 +541,32 @@ h1 code {
 		display: none;
 	}
 	.eyebrow,
-	body > footer {
+	body[data-demo-page='full'] > footer,
+	:where(body, .demo, .api-reference) > small {
 		color: CanvasText;
+	}
+	@layer demo-controls {
+		button[type='submit']:hover,
+		button[type='reset']:hover {
+			background-color: ButtonFace;
+			text-decoration: underline;
+		}
+	}
+}
+
+@media (forced-colors: active) {
+	@layer demo-controls {
+		input:not(
+			[type='checkbox'],
+			[type='radio'],
+			[type='submit'],
+			[type='reset']
+		),
+		select,
+		textarea {
+			background-color: Field;
+			background-image: none;
+		}
 	}
 }
 
