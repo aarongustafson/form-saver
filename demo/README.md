@@ -27,6 +27,10 @@ override a component's own layers, changing its layout or reducing control
 targets. Fix a shared cascade conflict in the starter, not with local pixel
 overrides or weaker tests.
 
+Inline code is reading content, not a button. Its default colors use `Canvas`
+and `CanvasText`; some platforms' dark `ButtonFace`/`ButtonText` pairing is not
+readable enough for prose. Keep native controls separate from this treatment.
+
 ## Managed files: do not patch consumer copies
 
 The exact allowlist is [shared-files.json](shared-files.json). It includes this

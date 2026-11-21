@@ -17,6 +17,28 @@ test.beforeEach(async ({ page }) => {
 
 const styles = await readDemoStyles();
 
+test('prose code remains readable with low-contrast dark Button colors', async ({
+	page,
+}) => {
+	const palette = {
+		Canvas: '#121212',
+		CanvasText: '#ffffff',
+		ButtonFace: '#393939',
+		ButtonText: '#000000',
+	};
+	await render(
+		page,
+		styles.replace(
+			/\b(CanvasText|Canvas|ButtonFace|ButtonText)\b/g,
+			(token) => palette[token],
+		),
+	);
+	const sample = (await measurements(page)).text.find(
+		(item) => item.selector === '.api-reference code',
+	);
+	expect(sample.ratio, JSON.stringify(sample)).toBeGreaterThanOrEqual(4.5);
+});
+
 test('shared form defaults yield to layered component controls', async ({
 	page,
 }) => {
@@ -106,7 +128,7 @@ const markup = `<!doctype html><html lang="en"><body data-demo-page="full">
 			</div>
 		</section>
 		<aside class="note"><p>Note with <code>code</code> and <a href="#example">a link</a>.</p><small>Note help</small></aside>
-		<section class="api-reference"><p>API information</p><small>API help</small></section>
+		<section class="api-reference"><p>API information with <code>inline code</code></p><small>API help</small></section>
 	</main>
 	<footer><p>Author credit</p></footer>
 </body></html>`;
@@ -187,6 +209,7 @@ async function measurements(page, includeLinks = false) {
 			'.note code',
 			'.note a',
 			'.api-reference p',
+			'.api-reference code',
 			'input',
 			'button',
 			'button[type="reset"]',
@@ -231,9 +254,7 @@ async function measurements(page, includeLinks = false) {
 
 function usesButtonSurface(sample) {
 	return typeof sample.selector === 'string'
-		? ['header code', 'button', 'button[type="reset"]'].includes(
-				sample.selector,
-			)
+		? ['button', 'button[type="reset"]'].includes(sample.selector)
 		: sample.selector.small === 4;
 }
 
@@ -265,16 +286,17 @@ test('pairs the demo shell surfaces and preserves note accents', async ({
 			};
 		});
 	const button = await colors('#button-palette');
-	for (const selector of [
-		'header code',
-		'button[type="submit"]',
-		'button[type="reset"]',
-	]) {
+	for (const selector of ['button[type="submit"]', 'button[type="reset"]']) {
 		const actual = await colors(selector);
 		expect(actual.foreground, selector).toBe(button.foreground);
 		expect(actual.background, selector).toBe(button.background);
 	}
 	const canvas = await colors('#canvas-palette');
+	for (const selector of ['header code', '.api-reference code']) {
+		const actual = await colors(selector);
+		expect(actual.foreground, selector).toBe(canvas.foreground);
+		expect(actual.background, selector).toBe(canvas.background);
+	}
 	for (const selector of ['.demo-section', '.demo', '.api-reference']) {
 		const actual = await colors(selector);
 		expect(actual.foreground, selector).toBe(canvas.foreground);

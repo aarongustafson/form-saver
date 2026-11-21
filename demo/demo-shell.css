@@ -226,8 +226,8 @@ samp {
 	font-size: 0.9em;
 }
 code {
-	background-color: ButtonFace;
-	color: ButtonText;
+	background-color: Canvas;
+	color: CanvasText;
 	padding: 0.125rem 0.25rem;
 	border-radius: 3px;
 }
