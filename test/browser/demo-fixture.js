@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
+import { Window } from 'happy-dom';
 
 const root = new URL('../../', import.meta.url);
 const distribution = new URL('node_modules/microlighter/dist/', root);
@@ -108,15 +109,32 @@ export async function expectNativeFocus(control) {
 	).toEqual([]);
 }
 
-export async function readDemoStyles(name = 'index.html') {
+export async function readDemoStyles(name = 'index.html', html) {
 	const page = new URL(`demo/${name}`, root);
-	const html = await readFile(page, 'utf8');
-	const links = [
-		...html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g),
-	];
+	if (html === undefined) html = await readFile(page, 'utf8');
+	const window = new Window({
+		settings: {
+			disableCSSFileLoading: true,
+			disableJavaScriptFileLoading: true,
+			disableJavaScriptEvaluation: true,
+			disableIframePageLoading: true,
+		},
+	});
+	let links;
+	try {
+		const document = new window.DOMParser().parseFromString(
+			html,
+			'text/html',
+		);
+		links = [
+			...document.querySelectorAll('link[rel~="stylesheet" i][href]'),
+		].map((link) => link.getAttribute('href'));
+	} finally {
+		await window.happyDOM.close();
+	}
 	return (
 		await Promise.all(
-			links.map(([, href]) => readFile(new URL(href, page), 'utf8')),
+			links.map((href) => readFile(new URL(href, page), 'utf8')),
 		)
 	).join('\n');
 }

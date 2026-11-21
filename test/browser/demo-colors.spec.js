@@ -674,6 +674,8 @@ test('code/live examples stack without horizontal page overflow', async ({
 async function hasAuthoredFallback(demos) {
 	return demos.evaluateAll((elements) => {
 		const visible = (element) => {
+			if (getComputedStyle(element).visibility !== 'visible')
+				return false;
 			while (
 				element &&
 				getComputedStyle(element).display === 'contents'
@@ -682,7 +684,6 @@ async function hasAuthoredFallback(demos) {
 			}
 			return element?.checkVisibility({
 				opacityProperty: true,
-				visibilityProperty: true,
 			});
 		};
 		const hasArea = (rect) => rect.width > 0 && rect.height > 0;
@@ -737,6 +738,17 @@ test.describe('authored demo without JavaScript', () => {
 		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(true);
 	});
 
+	test('native fallback respects visible text overrides without a wrapper box', async ({
+		page,
+	}) => {
+		await page.setContent(`
+			<div class="demo" style="visibility: hidden">
+				<span style="display: contents; visibility: visible">Readable fallback</span>
+			</div>
+		`);
+		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(true);
+	});
+
 	test('native fallback rejects empty, decorative, and hidden images', async ({
 		page,
 	}) => {
@@ -752,6 +764,10 @@ test.describe('authored demo without JavaScript', () => {
 		['style-only content', '<style>.demo { color: red; }</style>'],
 		['script-only content', '<script>window.example = true;</script>'],
 		['hidden text', '<p hidden>Hidden fallback</p>'],
+		[
+			'hidden display:contents text',
+			'<span style="display: contents; visibility: hidden">Hidden fallback</span>',
+		],
 		[
 			'invisible text',
 			'<p style="visibility: hidden">Invisible fallback</p>',

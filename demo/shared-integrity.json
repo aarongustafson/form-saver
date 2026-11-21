@@ -10,7 +10,7 @@
 	"test/demo-ownership.test.js": "81008c477fc5bba2ba945ed4770d46176cf9d12d058061628638f0b6be39ae9e",
 	"test/demo-shared.test.js": "b5f43907a8fabb2a95aa78be14390ce2cfbc7eee0eb490ac049145882fa80bd0",
 	"scripts/check-demo-shared.js": "34848b90753ccd3307267a18495f948b7999c4698204a52e67ae5c02b1f760da",
-	"test/browser/demo-fixture.js": "1880cd9d2038374078874018c1be24045d4d34a6266e64eeb10007e31489f750",
-	"test/browser/code-examples.spec.js": "0829444071222222336518188d8b895c09056645c8844467559ed99516236fc5",
-	"test/browser/demo-colors.spec.js": "862f1d7be931fc3c44475f7870ca8f781988fe727e520dae2ce705f1c790e99d"
+	"test/browser/demo-fixture.js": "dc4e8c49b040bdfe047a383f7cc2c8e281b6b671a86e4428b254fbc09b22583a",
+	"test/browser/code-examples.spec.js": "4f079157afd34a92006aefc93d22fe3deb07ae7675a0446540a194d23bc70630",
+	"test/browser/demo-colors.spec.js": "fa32ea0336e554496a80d8f0d4c5a87255b7b0836e9ef7d0aad0d0c3242ad1dc"
 }

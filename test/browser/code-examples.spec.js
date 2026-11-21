@@ -9,6 +9,28 @@ import {
 
 const root = new URL('../../', import.meta.url);
 
+for (const [name, html] of [
+	[
+		'reordered attributes',
+		'<link href="styles.css" rel="stylesheet"><link href="demo-shell.css" rel="stylesheet">',
+	],
+	[
+		'single-quoted attributes',
+		"<link rel='stylesheet' href='styles.css'><link rel='stylesheet' href='demo-shell.css'>",
+	],
+]) {
+	test(`stylesheet extraction preserves order with ${name}`, async () => {
+		const expected = await Promise.all(
+			['styles.css', 'demo-shell.css'].map((file) =>
+				readFile(new URL(`demo/${file}`, root), 'utf8'),
+			),
+		);
+		expect(await readDemoStyles('index.html', html)).toBe(
+			expected.join('\n'),
+		);
+	});
+}
+
 for (const colorScheme of ['light', 'dark']) {
 	test(`${colorScheme}: header stays transparent and navigation links use their native minimum size`, async ({
 		page,
