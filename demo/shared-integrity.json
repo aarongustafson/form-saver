@@ -1,6 +1,6 @@
 {
 	".github/instructions/demo.instructions.md": "4c769199749292a35849312181e87ebce530769f0e93eb889278b9ba8099ffe0",
-	"demo/README.md": "4bd0bb34c3d97c3e65fe767cf4f8b33b7475a87b79d9f09d8573635678538b9e",
+	"demo/README.md": "8dddf9864a397223581d55123d9e2842ad435d1dd5a33f01a4fecff7c10ddd8c",
 	"demo/shared-files.json": "91bc9fe00d714b68a16f8e401ddebb39753dd026d98016461a0d9170a3f3e3bb",
 	"demo/demo-shell.css": "7caf335376af0bc83c5d8d99c6e6a916a0daec4748f92c902c78699f67f671df",
 	"demo/code-examples.js": "856bedc4aacf0919511ac71cedaae0cdfe39fc405ffc0a4aeeb97db5918b069f",
@@ -10,7 +10,7 @@
 	"test/demo-ownership.test.js": "81008c477fc5bba2ba945ed4770d46176cf9d12d058061628638f0b6be39ae9e",
 	"test/demo-shared.test.js": "b5f43907a8fabb2a95aa78be14390ce2cfbc7eee0eb490ac049145882fa80bd0",
 	"scripts/check-demo-shared.js": "34848b90753ccd3307267a18495f948b7999c4698204a52e67ae5c02b1f760da",
-	"test/browser/demo-fixture.js": "1962b8699d1be8d1bcccf2649ecef11323a28777a2a563479b2c3a9873da0c4a",
-	"test/browser/code-examples.spec.js": "19d44d7c4ae1d3cacee478adf366817472869240b3fdf6e68cd5ba350877c2f9",
-	"test/browser/demo-colors.spec.js": "1274decf9861ff85330e24c5d43579eed439c10e4b61d5d7f3b9109db1b0b2c2"
+	"test/browser/demo-fixture.js": "1880cd9d2038374078874018c1be24045d4d34a6266e64eeb10007e31489f750",
+	"test/browser/code-examples.spec.js": "0829444071222222336518188d8b895c09056645c8844467559ed99516236fc5",
+	"test/browser/demo-colors.spec.js": "862f1d7be931fc3c44475f7870ca8f781988fe727e520dae2ce705f1c790e99d"
 }

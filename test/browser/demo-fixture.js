@@ -5,6 +5,41 @@ const root = new URL('../../', import.meta.url);
 const distribution = new URL('node_modules/microlighter/dist/', root);
 const cdn = 'https://cdn.jsdelivr.net/npm/microlighter@2.2.0/dist/';
 
+export async function expectPairLayout(pair, width) {
+	await expect(pair.locator(':scope > :first-child')).toBeVisible();
+	await expect(pair.locator(':scope > .demo')).toBeVisible();
+	const layout = await pair.evaluate((element) => {
+		const code = element.firstElementChild.getBoundingClientRect();
+		const demo = element
+			.querySelector(':scope > .demo')
+			.getBoundingClientRect();
+		return {
+			code: { right: code.right, bottom: code.bottom },
+			demo: { x: demo.x, y: demo.y },
+			overflow: document.documentElement.scrollWidth > window.innerWidth,
+			columns: getComputedStyle(element)
+				.gridTemplateColumns.replace(/\[[^\]]*\]/g, '')
+				.trim()
+				.split(/\s+/).length,
+		};
+	});
+	expect(layout.overflow).toBe(false);
+	if (width < 768) expect(layout.columns).toBe(1);
+	if (layout.columns === 1)
+		expect(layout.code.bottom).toBeLessThanOrEqual(layout.demo.y);
+	else expect(layout.code.right).toBeLessThanOrEqual(layout.demo.x);
+}
+
+export async function countAuthoredPairs(page, html) {
+	return page.evaluate(
+		(source) =>
+			new DOMParser()
+				.parseFromString(source, 'text/html')
+				.querySelectorAll('.code-demo-pair').length,
+		html,
+	);
+}
+
 export async function expectNativeFocus(control) {
 	await control.focus();
 	await expect(control).toBeFocused();
@@ -94,6 +129,7 @@ export async function serveDemo(
 		themeFailure = false,
 		distinctFields = false,
 		translucentFields = false,
+		transformHtml,
 	} = {},
 ) {
 	await page.addInitScript(() => {
@@ -141,6 +177,9 @@ export async function serveDemo(
 			throw error;
 		}
 		const extension = file.pathname.split('.').at(-1);
+		if (extension === 'html' && transformHtml) {
+			body = transformHtml(body.toString());
+		}
 		if (
 			(distinctFields || translucentFields) &&
 			extension === 'css' &&

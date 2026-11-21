@@ -82,6 +82,9 @@ The shared no-JavaScript check looks for useful fallback across the live
 examples, not just the first one. Do not add filler text or rearrange examples
 to satisfy it. Source-only custom elements are not native image fallbacks;
 authored images need meaningful `alt` text and must remain visible.
+Hidden or transparent text/images and script/style source do not count as
+fallback content. Code/live pairs may stay in one column on wide screens when
+the example needs that space; the shared checks follow the computed grid.
 
 Preserve the browser’s native focus ring, including on Copy controls. Leave
 space for the ring around focused controls; do not clip it to a rounded panel.
@@ -97,6 +100,8 @@ The enhancement status element supplies `data-loading-message`,
 `data-failure-message`, and `data-theme-failure-message`. Translate these
 alongside the page, its code-panel labels, and its visible content; the shared
 loader does not supply English UI defaults.
+Shared failure checks compare the displayed status with these authored
+messages, so translating them does not require changing the tests.
 
 Preserve semantic `mark` elements around component tags and API configuration
 inside displayed code. Keep inline API names in plain `code`, without `mark`

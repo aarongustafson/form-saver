@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import {
 	expectNativeFocus,
+	expectPairLayout,
 	readDemoStyles,
 	serveDemo,
 } from './demo-fixture.js';
@@ -286,39 +287,26 @@ for (const file of fullPages) {
 				.toBe(true);
 			const pair = page.locator('.code-demo-pair').first();
 			if (await pair.count()) {
-				const layout = await pair.evaluate((element) => {
-					const code = element
-						.querySelector('micro-lighter')
-						.getBoundingClientRect();
-					const demo = element
-						.querySelector('.demo')
-						.getBoundingClientRect();
-					return {
-						code: {
-							x: code.x,
-							y: code.y,
-							right: code.right,
-							bottom: code.bottom,
-						},
-						demo: { x: demo.x, y: demo.y },
-						overflow:
-							document.documentElement.scrollWidth >
-							window.innerWidth,
-					};
-				});
-				expect(layout.overflow, `${file} at ${width}px`).toBe(false);
-				if (width === 320)
-					expect(layout.code.bottom).toBeLessThanOrEqual(
-						layout.demo.y,
-					);
-				else
-					expect(layout.code.right).toBeLessThanOrEqual(
-						layout.demo.x,
-					);
+				await expectPairLayout(pair, width);
 			}
 		}
 	});
 }
+
+test('intentionally stacked pairs reflow at wide and narrow widths', async ({
+	page,
+}) => {
+	await page.setContent(`
+		<style>
+			.code-demo-pair { display: grid; grid-template-columns: 1fr; }
+		</style>
+		<div class="code-demo-pair"><pre>Code</pre><div class="demo">Live example</div></div>
+	`);
+	for (const width of [320, 1400]) {
+		await page.setViewportSize({ width, height: 900 });
+		await expectPairLayout(page.locator('.code-demo-pair'), width);
+	}
+});
 
 for (const { file, language } of examples) {
 	test(`${file}: ${language} highlighting preserves text and keyboard Copy includes the complete snippet`, async ({
@@ -379,11 +367,19 @@ for (const { file, language } of examples) {
 test('a failed optional theme reports only the missing theme while enhancement remains available', async ({
 	page,
 }) => {
-	await serveDemo(page, { themeFailure: true });
+	await serveDemo(page, {
+		themeFailure: true,
+		transformHtml: (html) =>
+			html.replace(
+				/data-theme-failure-message="[^"]+"/,
+				'data-theme-failure-message="No se pudo cargar el tema de sintaxis."',
+			),
+	});
 	await page.goto('http://code-demo.test/demo/index.html');
-	await expect(page.locator('#microlighter-status')).toContainText(
-		'Code highlighting and Copy controls are available, but the syntax theme could not load.',
-	);
+	const status = page.locator('#microlighter-status');
+	const message = await status.getAttribute('data-theme-failure-message');
+	expect(message?.trim()).toBeTruthy();
+	await expect(status).toHaveText(message);
 	await expect(
 		page
 			.locator('micro-lighter')
@@ -395,14 +391,22 @@ test('a failed optional theme reports only the missing theme while enhancement r
 test('a failed grammar retains authored marks and reports the partial failure', async ({
 	page,
 }) => {
-	await serveDemo(page, { grammarFailure: true });
+	await serveDemo(page, {
+		grammarFailure: true,
+		transformHtml: (html) =>
+			html.replace(
+				/data-failure-message="[^"]+"/,
+				'data-failure-message="El ejemplo sigue disponible sin resaltado."',
+			),
+	});
 	await page.goto('http://code-demo.test/demo/index.html');
 	const code = page
 		.locator('micro-lighter[language="html"] code:has(mark)')
 		.first();
-	await expect(page.locator('#microlighter-status')).toContainText(
-		'Code remains readable and selectable',
-	);
+	const status = page.locator('#microlighter-status');
+	const message = await status.getAttribute('data-failure-message');
+	expect(message?.trim()).toBeTruthy();
+	await expect(status).toHaveText(message);
 	await expect(code.locator('mark').first()).toBeVisible();
 	await expect
 		.poll(() =>

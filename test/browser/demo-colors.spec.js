@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import {
+	countAuthoredPairs,
 	expectNativeFocus,
+	expectPairLayout,
 	readDemoStyles,
 	serveDemo,
 } from './demo-fixture.js';
@@ -670,17 +672,41 @@ test('code/live examples stack without horizontal page overflow', async ({
 });
 
 async function hasAuthoredFallback(demos) {
-	return demos.evaluateAll((elements) =>
-		elements.some(
-			(element) =>
-				Boolean(element.textContent.trim()) ||
-				[...element.querySelectorAll('img[alt]')].some(
-					(image) =>
-						image.getAttribute('alt').trim() &&
-						image.getClientRects().length > 0,
-				),
-		),
-	);
+	return demos.evaluateAll((elements) => {
+		const visible = (element) => {
+			while (
+				element &&
+				getComputedStyle(element).display === 'contents'
+			) {
+				element = element.parentElement;
+			}
+			return element?.checkVisibility({
+				opacityProperty: true,
+				visibilityProperty: true,
+			});
+		};
+		const hasArea = (rect) => rect.width > 0 && rect.height > 0;
+		return elements.some((element) => {
+			const walker = document.createTreeWalker(
+				element,
+				NodeFilter.SHOW_TEXT,
+			);
+			while (walker.nextNode()) {
+				const text = walker.currentNode;
+				if (!text.textContent.trim() || !visible(text.parentElement))
+					continue;
+				const range = document.createRange();
+				range.selectNodeContents(text);
+				if ([...range.getClientRects()].some(hasArea)) return true;
+			}
+			return [...element.querySelectorAll('img[alt]')].some(
+				(image) =>
+					image.getAttribute('alt').trim() &&
+					visible(image) &&
+					[...image.getClientRects()].some(hasArea),
+			);
+		});
+	});
 }
 
 test.describe('authored demo without JavaScript', () => {
@@ -700,6 +726,17 @@ test.describe('authored demo without JavaScript', () => {
 		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(true);
 	});
 
+	test('native fallback accepts rendered text without a wrapper box', async ({
+		page,
+	}) => {
+		await page.setContent(`
+			<div class="demo" style="display: contents">
+				<span style="display: contents">Readable native fallback</span>
+			</div>
+		`);
+		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(true);
+	});
+
 	test('native fallback rejects empty, decorative, and hidden images', async ({
 		page,
 	}) => {
@@ -709,6 +746,45 @@ test.describe('authored demo without JavaScript', () => {
 			<div class="demo"><img alt="Hidden fallback" width="200" height="20" hidden></div>
 		`);
 		expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(false);
+	});
+
+	for (const [name, content] of [
+		['style-only content', '<style>.demo { color: red; }</style>'],
+		['script-only content', '<script>window.example = true;</script>'],
+		['hidden text', '<p hidden>Hidden fallback</p>'],
+		[
+			'invisible text',
+			'<p style="visibility: hidden">Invisible fallback</p>',
+		],
+		['transparent text', '<p style="opacity: 0">Transparent fallback</p>'],
+		[
+			'invisible image',
+			'<img alt="Invisible fallback" width="200" height="20" style="visibility: hidden">',
+		],
+		[
+			'transparent image',
+			'<span style="opacity: 0"><img alt="Transparent fallback" width="200" height="20"></span>',
+		],
+	]) {
+		test(`native fallback rejects ${name}`, async ({ page }) => {
+			await page.setContent(`<div class="demo">${content}</div>`);
+			expect(await hasAuthoredFallback(page.locator('.demo'))).toBe(
+				false,
+			);
+		});
+	}
+
+	test('authored pair counting accepts class order and HTML quoting', async ({
+		page,
+	}) => {
+		const html = `
+			<div class="stacked code-demo-pair"><pre>Code</pre><div class="demo">Example</div></div>
+			<div class='code-demo-pair stacked'><pre>Code</pre><div class="demo">Example</div></div>
+			<div class="not-code-demo-pair">Unrelated</div>
+		`;
+		await page.setContent(html);
+		expect(await countAuthoredPairs(page, html)).toBe(2);
+		await expect(page.locator('.code-demo-pair')).toHaveCount(2);
 	});
 
 	test('keeps fallback content and code/live pairs usable', async ({
@@ -721,9 +797,7 @@ test.describe('authored demo without JavaScript', () => {
 		await serveDemo(page);
 		await page.goto('http://code-demo.test/demo/index.html');
 		const pairs = page.locator('.code-demo-pair');
-		const authoredPairs = [
-			...html.matchAll(/class="code-demo-pair(?:\s[^"]*)?"/g),
-		].length;
+		const authoredPairs = await countAuthoredPairs(page, html);
 		expect(authoredPairs).toBeGreaterThan(0);
 		await expect(pairs).toHaveCount(authoredPairs);
 		const hasFallback = await hasAuthoredFallback(page.locator('.demo'));
@@ -731,23 +805,7 @@ test.describe('authored demo without JavaScript', () => {
 		for (const width of [1000, 320]) {
 			await page.setViewportSize({ width, height: 800 });
 			for (const pair of await pairs.all()) {
-				const code = await pair
-					.locator(':scope > :first-child')
-					.boundingBox();
-				const demo = await pair.locator(':scope > .demo').boundingBox();
-				expect(code).not.toBeNull();
-				expect(demo).not.toBeNull();
-				const columns = await pair.evaluate(
-					(element) =>
-						getComputedStyle(element).gridTemplateColumns.split(' ')
-							.length,
-				);
-				if (width < 768) expect(columns).toBe(1);
-				if (columns > 1) {
-					expect(demo.x).toBeGreaterThanOrEqual(code.x + code.width);
-				} else {
-					expect(demo.y).toBeGreaterThanOrEqual(code.y + code.height);
-				}
+				await expectPairLayout(pair, width);
 			}
 			expect(
 				await page.evaluate(() => document.documentElement.scrollWidth),
