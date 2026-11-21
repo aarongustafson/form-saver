@@ -51,9 +51,13 @@ the new source content; it is not an updater and cannot fetch or publish files.
 
 In the private workspace, `npm run demos:sync -- <component> --dry-run`
 previews routine updates; `--check` compares shared files and provenance.
-With no flag, the command requires a clean, committed starter, validates it,
-updates clean enrolled consumers on feature branches, and runs their checks,
-including browser tests. It never commits, pushes, or installs dependencies.
+With no flag, the command requires a clean, committed starter, runs its full
+checks including browser tests, and updates clean enrolled consumers on feature
+branches. Consumers run lint, unit, and declared type checks by default.
+Use `--browser` to run their browser suites locally too. Otherwise their
+receipts explicitly mark local browser checks skipped; verify the PR's browser
+CI before merging. Read-only modes cannot be combined with `--browser`.
+The command never commits, pushes, or installs dependencies.
 
 The generated `demo/shared-source.json` records the source commit and the
 integrity snapshot’s hash. Do not edit it to bypass drift protection. Initial

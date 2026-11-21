@@ -12,6 +12,16 @@ regression test, not a local override or weakened assertion.
 Do not fork the common tests, change integrity metadata by hand, or modify
 runtime behavior or publishing automation to make a demo migration pass.
 
+## Routine shared updates
+
+Workspace `demos:sync` always runs full starter validation, including browser
+tests. Consumer sync runs lint, unit, and declared type checks by default;
+`--browser` also runs local consumer browser suites. Unrequested browser checks
+are reported skipped, not passed. Verify PR browser CI before merging routine
+updates; keep those workflows and all integrity/provenance guards intact.
+Initial migrations and changes to component behavior still need full local
+browser validation. Do not use the faster sync mode to hide a failing test.
+
 ## Shared test fixtures
 
 Load styles in the actual page order and opt fixtures into the page mode they
