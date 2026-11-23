@@ -12,6 +12,15 @@ regression test, not a local override or weakened assertion.
 Do not fork the common tests, change integrity metadata by hand, or modify
 runtime behavior or publishing automation to make a demo migration pass.
 
+## Linkable examples
+
+Give each authored example a stable, descriptive, unique `id` on the section or
+block containing its heading and code/live pair. Nested alternatives need
+individual destinations as well as any group anchor. Preserve existing IDs,
+avoid collisions with field/component IDs, and include CDN/localized pages.
+README headings are auto-linked by GitHub and similar platforms; do not add
+manual named anchors there.
+
 ## Routine shared updates
 
 Workspace `demos:sync` always runs full starter validation, including browser

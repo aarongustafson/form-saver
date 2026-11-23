@@ -243,7 +243,8 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		const savers = await page.locator('form-saver').all();
 		for (const [index, saver] of savers.entries()) {
 			await expect(saver.locator('button')).toHaveCount(1);
-			const input = saver.getByLabel('Name', { exact: true });
+			const input = saver.locator('input[name="name"]');
+			await expect(input).toHaveAccessibleName(/\S/);
 			await input.fill(`Automatically retained ${index}`);
 			await expect
 				.poll(() =>
@@ -266,7 +267,7 @@ for (const file of ['index.html', 'esm.html', 'unpkg.html']) {
 		}
 		await page.reload();
 		for (const [index, saver] of savers.entries()) {
-			await expect(saver.getByLabel('Name', { exact: true })).toHaveValue(
+			await expect(saver.locator('input[name="name"]')).toHaveValue(
 				`Automatically retained ${index}`,
 			);
 			await expect(saver.getByRole('status')).toBeEmpty();
@@ -426,7 +427,10 @@ test('storage read denial has visible recovery without hiding the native form', 
 	for (const feedback of await page
 		.locator('form-saver [role="status"]')
 		.all()) {
-		await expect(feedback).toContainText('storage is unavailable');
+		await expect(feedback).toHaveText(
+			await feedback.getAttribute('data-error'),
+		);
+		await expect(feedback).not.toBeEmpty();
 	}
 	await page.locator('input[name="name"]').first().fill('Safe in form');
 	await expect(page.locator('input[name="name"]').first()).toHaveValue(

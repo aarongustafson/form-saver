@@ -6,15 +6,22 @@
 [![License](https://img.shields.io/npm/l/@aarongustafson/form-saver)](https://github.com/aarongustafson/form-saver/blob/main/LICENSE)
 [![Type definitions](https://img.shields.io/npm/types/@aarongustafson/form-saver)](https://github.com/aarongustafson/form-saver/blob/main/form-saver.d.ts)
 
-A web component that stores (and restores) values within the first form it wraps.
+`<form-saver>` saves drafts from the first form it wraps to `localStorage`
+and restores them on a later visit. Without JavaScript, the native form remains
+usable, but drafts aren’t saved or restored.
 
-It is designed for crash recovery and interrupted sessions:
+It’s designed for crash recovery and interrupted sessions:
 
 - Debounces saves to `localStorage` as users type.
 - Restores values when the page is loaded again.
-- Clears saved values after a successful submit flow.
-- Optionally retains selected fields after submit.
-- Never saves or restores password fields.
+- Clears the full draft on `pagehide` following a submit it observed as uncanceled.
+- Optionally retains selected fields during that cleanup.
+- Excludes password and file controls.
+
+That submit/pagehide sequence does **not** confirm server acceptance. Drafts
+are plaintext unless you supply a storage transformation, and any JavaScript
+running on the same origin can read them. The retention checkbox controls
+post-submit storage, not consent to autosave.
 
 ## Demo
 
@@ -35,12 +42,12 @@ npm install @aarongustafson/form-saver
 
 ## Usage
 
-### Option 1: Auto-define the custom element (easiest)
+### Option 1: Register automatically
 
-Import the package to automatically define the `<form-saver>` custom element:
+Import the definition helper to register `<form-saver>`:
 
 ```javascript
-import '@aarongustafson/form-saver';
+import '@aarongustafson/form-saver/define.js';
 ```
 
 Or use the define-only script in HTML:
@@ -54,13 +61,19 @@ Or use the define-only script in HTML:
 
 ### Option 2: Import the class and define manually
 
-Import the class and define the custom element with your preferred tag name:
+The package’s main import and `form-saver.js` export the class without registering
+it. Define the tag used in your HTML:
 
 ```javascript
-import { FormSaverElement } from '@aarongustafson/form-saver/form-saver.js';
+import { FormSaverElement } from '@aarongustafson/form-saver';
 
-customElements.define('my-custom-name', FormSaverElement);
+customElements.define('form-saver', FormSaverElement);
 ```
+
+You can use a different tag name if you update your markup to match.
+`define.js` also exports `defineComponentName(tagName = 'form-saver')`.
+Importing it calls that helper; it skips already registered tags and returns
+`false` when a browser registry isn’t available, or `true` when one is.
 
 ### Basic Example
 
@@ -80,7 +93,23 @@ customElements.define('my-custom-name', FormSaverElement);
 </form-saver>
 ```
 
-The component targets the first descendant `<form>`.
+Provide a working endpoint for `action`; `/contact` is an example, not a service
+provided by this package. The component targets the first descendant `<form>`.
+Without one, it doesn’t initialize.
+
+## Autosave, Submission, and Retention
+
+The component restores on connection and saves as people edit. It doesn’t
+intercept submission, check the response, or reset live fields after submission.
+When its submit listener sees an event that hasn’t been canceled, it saves the
+current state and marks cleanup as pending. A later `pagehide` removes the full
+draft and optionally writes retained fields. This can happen even if the server
+rejects the submission; it isn’t proof that the message arrived.
+
+If your application cancels submission, cancel it before the component’s
+listener runs. Cancellation by a later listener won’t undo pending cleanup.
+For an application-controlled submission, call `clearSavedData()` after your
+application confirms acceptance. That method clears storage, not live fields.
 
 ### Retain Selected Fields After Submit
 
@@ -89,19 +118,25 @@ Use `retain` to keep specific field names (or ids when `name` is missing) after 
 ```html
 <form-saver retain="name email">
   <form action="/contact" method="post">
-    <input name="name" />
-    <input name="email" type="email" />
-    <textarea name="message"></textarea>
+    <label>Name <input name="name" autocomplete="name" /></label>
+    <label
+      >Email <input name="email" type="email" autocomplete="email"
+    /></label>
+    <label>Message <textarea name="message"></textarea></label>
     <button type="submit">Send</button>
   </form>
 </form-saver>
 ```
 
-In this example, `message` is cleared after submit while `name` and `email` remain.
+During post-submit pagehide cleanup, this stores `name` and `email`, but not
+`message`. It doesn’t clear those fields in the current form.
 
 ### Let Users Control Retention
 
-To inject an opt-in checkbox, add `retain-choice`.
+Add `retain-choice` to insert an initially unchecked, labeled checkbox.
+It controls whether the selected fields are retained during post-submit cleanup.
+It does **not** turn autosave on or off. If your application requires consent
+before saving drafts, obtain that consent before enabling the component.
 
 ```html
 <form-saver
@@ -110,8 +145,10 @@ To inject an opt-in checkbox, add `retain-choice`.
   retain-choice-label="Store my contact information for later"
 >
   <form action="/contact" method="post">
-    <input name="name" />
-    <input name="email" type="email" />
+    <label>Name <input name="name" autocomplete="name" /></label>
+    <label
+      >Email <input name="email" type="email" autocomplete="email"
+    /></label>
     <button type="submit">Send</button>
   </form>
 </form-saver>
@@ -119,33 +156,25 @@ To inject an opt-in checkbox, add `retain-choice`.
 
 By default, the checkbox is inserted just before the first submit control.
 
-You can control placement with `retain-choice-container`, which accepts a CSS selector. The matched element is used as a container — the checkbox is appended inside it:
-
-```html
-<form-saver
-  retain="name email"
-  retain-choice
-  retain-choice-container=".retain-slot"
->
-  <form action="/contact" method="post">
-    <input name="name" />
-    <input name="email" type="email" />
-    <div class="retain-slot"></div>
-    <button type="submit">Send</button>
-  </form>
-</form-saver>
-```
+Use `retain-choice-container` to append it inside a matching element in the
+wrapped form. If no element matches, the component uses its default placement;
+if there’s no submit control, it appends the checkbox to the form. Supply a valid
+CSS selector—invalid syntax can interrupt initialization.
+See the [placement example](https://aarongustafson.github.io/form-saver/demo/#retention-placement).
+Changing the label, placement, or `retain-choice` rebuilds the control and resets
+it to unchecked. Both `retain` and `retain-choice` must be present when the
+control is rendered.
 
 ## Attributes
 
-| Attribute                 | Type      | Default                                    | Description                                                                                 |
-| ------------------------- | --------- | ------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `retain`                  | `string`  | `""`                                       | Space-separated field names (or ids when name is missing) to retain after successful submit |
-| `retain-choice`           | `boolean` | `false`                                    | Inject an opt-in retention checkbox                                                         |
-| `retain-choice-label`     | `string`  | `"Store my contact information for later"` | Plain-text label for the injected checkbox                                                  |
-| `retain-choice-container` | `string`  | `""`                                       | CSS selector for a container element into which the checkbox is appended                    |
-| `storage-key`             | `string`  | derived                                    | Optional storage key override                                                               |
-| `script`                  | `string`  | none                                       | Application behavior module; storage hooks are optional                                     |
+| Attribute                 | Type      | Default                                    | Description                                                                                             |
+| ------------------------- | --------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `retain`                  | `string`  | `""`                                       | Space-separated field names (or ids when name is missing) to retain during post-submit pagehide cleanup |
+| `retain-choice`           | `boolean` | `false`                                    | Inject an opt-in retention checkbox                                                                     |
+| `retain-choice-label`     | `string`  | `"Store my contact information for later"` | Plain-text label for the injected checkbox                                                              |
+| `retain-choice-container` | `string`  | `""`                                       | CSS selector for a container element into which the checkbox is appended                                |
+| `storage-key`             | `string`  | derived                                    | Optional storage key override                                                                           |
+| `script`                  | `string`  | none                                       | Application behavior module; storage hooks are optional                                                 |
 
 Default derived storage key format:
 
@@ -154,6 +183,27 @@ form-saver:{method}:{resolvedActionUrl}
 ```
 
 Where `method` and `action` come from the wrapped form.
+
+Forms with the same derived key on the same origin share a draft. Set
+`storage-key` to keep unrelated forms separate; the demos use distinct authored
+keys. Choose keys that separate users and form versions when your application
+needs that distinction, and clear drafts according to your logout and retention
+policy.
+
+## Properties and Localization
+
+The reflected properties are `retain`, `retainChoice`, `retainChoiceLabel`,
+`retainChoiceContainer`, `storageKey`, and `script`. String getters return the
+attribute value or `null` when absent; `retainChoice` returns a boolean.
+String setters remove the attribute for `null`, `undefined`, or `""`.
+The checkbox uses the default label when `retain-choice-label` is empty.
+
+Set `retain-choice-label` to translate the generated checkbox or use your
+application’s vocabulary. There’s no shared message configuration object.
+Labels, instructions, buttons, and recovery messages in your form remain your
+responsibility. The [translated example](https://aarongustafson.github.io/form-saver/demo/#translated-retention)
+shows the checkbox and authored recovery text together.
+`beforeSave` and `beforeRestore` are callback properties described below.
 
 ## Methods
 
@@ -166,8 +216,8 @@ Where `method` and `action` come from the wrapped form.
 
 Calls to `saveFormState()` save immediately. Saves triggered by `input` and
 `change` events use a short debounce to avoid serializing the complete form and
-writing to `localStorage` for every keystroke. Pending changes are flushed when
-the page is hidden.
+writing to `localStorage` for every keystroke. Pending changes are flushed on
+`pagehide`, not merely when the tab becomes hidden.
 
 With `script` or either storage hook configured, `saveFormState()` and
 `restoreFormState()` return promises that settle after their work completes
@@ -180,6 +230,11 @@ Changing callbacks or the storage key also cancels older debounced autosaves.
 An explicit restore cancels an older queued autosave; edits made after that
 restore starts still take precedence.
 
+The promises can resolve after failure; listen for `form-saver-error` if your
+application needs to detect a failed save before navigating.
+`clearSavedData()` cancels pending work, but doesn’t disable future autosaves
+when people edit the form again.
+
 ## Behavior Modules
 
 Use `script` to connect application behavior to the form. It can configure
@@ -189,11 +244,29 @@ drafts are stored:
 ```html
 <form-saver script="./writing-help.js">
   <form action="/contact" method="post">
-    <!-- Your labelled fields -->
+    <label>Message <textarea name="message"></textarea></label>
+    <button
+      type="button"
+      hidden
+      data-toggle-help
+      aria-controls="writing-tips"
+      aria-expanded="true"
+      data-show-label="Show writing tips"
+      data-hide-label="Hide writing tips"
+    >
+      Hide writing tips
+    </button>
+    <p id="writing-tips">
+      Describe what you tried and what you expected. Don’t include passwords or
+      other sensitive details.
+    </p>
+    <button type="submit">Send</button>
   </form>
 </form-saver>
 ```
 
+Save the [complete writing-help module](./demo/writing-help.js) beside your page
+to run this example. Without JavaScript, the tips remain visible.
 The URL resolves against the element’s document base URI (including `<base>`),
 not the component module’s URL. Only HTTP and HTTPS module URLs are accepted.
 Use trusted modules: they execute with your page’s JavaScript privileges.
@@ -285,8 +358,8 @@ and remain stored unchanged, even when no restore callback is configured.
 
 Saves and restoration wait for initialization. If loading, initialization, or
 a hook fails, `form-saver-error` reports it; the component does **not** retry
-with plaintext. Failed restores leave the stored payload and current fields
-untouched. Malformed stored JSON also reports a `read` error when a script or
+with plaintext. Failed decoding or validation of an application payload leaves
+the stored payload and current fields untouched. Malformed stored JSON also reports a `read` error when a script or
 hook is configured, without removing the stored payload. Existing plaintext
 drafts are not automatically migrated: use a
 new storage key or implement an explicit migration policy in your module.
@@ -326,7 +399,7 @@ nor restored, even if their field names appear in `retain`.
 
 ## Privacy and Storage Errors
 
-Without an encryption transformation, saved values are stored as plain text in
+Without an encryption transformation, saved values are stored as plaintext in
 `localStorage`, including when `script` only adds other behavior. Any JavaScript running
 on the same origin can read them, so avoid wrapping forms that collect other
 sensitive information that should not persist on the device. The component
@@ -341,7 +414,7 @@ Incompatible application payloads are preserved rather than treated as native
 drafts, including envelopes containing byte or string arrays; application
 restore hooks remain responsible for decoding their format.
 
-Encryption is only as useful as the application's key and session management.
+Encryption is only as useful as the application’s key and session management.
 Do not persist a real encryption key alongside drafts. Authorize key access on
 the server and revoke access on logout or session expiry. Another person can
 still restore drafts if the prior session authorizes the key. Encryption does
@@ -381,33 +454,30 @@ foreground and background together when styling text fields, buttons, and
 reading panels. Don’t use color alone to explain saved, restored, or failed
 storage.
 
-The demos use `CanvasText`/`Canvas` for instructions and feedback,
-`FieldText`/`Field` for fields and code blocks, and
-`ButtonText`/`ButtonFace` for buttons and inline code. Translucent control and
-code surfaces have a Canvas backplate. Browser focus indicators remain intact.
-Forced colors use solid `Field` and `ButtonFace` surfaces when gradients are
-suppressed, with automatic adjustment intact. Increased contrast keeps
-full-strength supporting text. These pairs passed the 19 distinct recorded study
-palettes; they aren’t a guarantee for every platform or author override.
-
 The component doesn’t emit saved or restored events or insert status messages.
 Saving happens automatically as people edit the form, without an extra save
 control, routine status message, or focus change. The demos provide empty
 `role="status"` regions that show authored recovery text only when
 `form-saver-error` occurs. The `data-error` string in the demo markup can be
-translated; it isn’t a component attribute. Feedback never copies field values
-into announcements.
+translated; it isn’t a component attribute. The demo’s
+[feedback module](./demo/feedback.js) assigns that string with `textContent` and
+never copies field values into announcements. Load an error listener before
+registration to catch initial restoration errors. The demo message stays visible
+after an error; it doesn’t confirm a later save or restore.
 
-Without JavaScript, or if a module fails to load, the native form remains usable,
-but the component can’t save or restore drafts. Provide a working form endpoint
+Without JavaScript, or if the component or configured behavior module fails to
+load, the native form remains usable, but drafts can’t be saved or restored.
+Provide a working form endpoint
 and visible instructions to keep a copy before leaving. The demo endpoints are
 placeholders, not submission services. A storage error leaves the current form
 values in place; authors should show visible recovery instructions with
 `form-saver-error` instead of relying on a console message.
 
-The retention checkbox controls which fields survive submission, **not** whether
-drafts are saved before submission. The demos use invented details and distinct
-storage keys so their drafts don’t overwrite one another.
+On disconnection, the component removes its form and page listeners, cancels
+debounced saves, invalidates pending asynchronous work, and cleans up its behavior
+module. It leaves live values and stored data in place. On reconnection it
+initializes again and attempts restoration; reinstall directly assigned hooks
+before retrying a transformed draft.
 
 ## Browser Support
 
