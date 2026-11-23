@@ -133,6 +133,13 @@ Keep the page focused on working examples, not how the demo was built.
 - Use one descriptive heading for a single example. For instance, don’t nest
   “Custom Key Attribute” under “Custom Variable Name” when both introduce the
   same example. Group related examples only when a group heading helps readers.
+- Give every example a stable, descriptive, unique `id` on the section or block
+  containing its heading, explanation, and code/live pair. Related alternatives
+  each need their own destination, not just an anchor for the group. Apply this
+  to CDN and localized demo pages too. Preserve existing anchors and avoid
+  collisions with field or component IDs so links remain useful for support.
+- README headings already receive linkable IDs on GitHub and similar platforms.
+  Don’t add manual named anchors to READMEs.
 - Avoid redundant section wrappers or adjacent separators with no content
   between them. Keep meaningful headings, reading order, and code/live pairs.
 - Keep instructions needed for keyboard use, loading, failure, and

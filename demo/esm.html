@@ -44,8 +44,10 @@
 
 			<p>
 				This page imports the class and registers it manually. Use
-				invented details: localStorage keeps drafts on this device.
-				Retention choices affect post-submit data, not draft saving.
+				invented details: <code>localStorage</code> keeps plaintext
+				drafts on this device, readable by scripts on this origin.
+				Passwords and files are excluded. Retention choices affect
+				post-submit data, not consent to autosave.
 			</p>
 			<p>
 				Without JavaScript, or if the CDN module fails, the native form
@@ -53,28 +55,41 @@
 				leaving. The placeholder <code>/demo-contact</code> endpoint has
 				no submission service.
 			</p>
-			<section class="demo-section">
+			<section class="demo-section" id="esm-class-import">
 				<h2>Class-only import</h2>
+				<p>
+					Keep the module script with the form below. Its guard avoids
+					registering the tag twice. Each demo uses a distinct storage
+					key. Load <a href="./feedback.js">feedback.js</a> before
+					registration to display the authored recovery message.
+				</p>
 				<div class="code-demo-pair">
 					<micro-lighter
 						class="code-panel"
-						language="javascript"
+						language="html"
 						controls="copy"
-						data-label="JavaScript"
+						data-label="HTML"
 					>
 						<pre
 							aria-label="Class-only import code 1"
 							tabindex="0"
-						><code><mark>import { FormSaverElement } from
-  'https://esm.sh/@aarongustafson/form-saver@1.1.0/form-saver.js?bundle&amp;target=es2022';</mark>
-<mark>customElements.define('form-saver', FormSaverElement);</mark>
+						><code>&lt;script src="./feedback.js" type="module"&gt;&lt;/script&gt;
+<mark>&lt;script type="module"&gt;
+  import { FormSaverElement } from
+    'https://esm.sh/@aarongustafson/form-saver@1.1.0/form-saver.js?bundle&amp;target=es2022';
+  if (!customElements.get('form-saver')) {
+    customElements.define('form-saver', FormSaverElement);
+  }
+&lt;/script&gt;</mark>
 
 <mark>&lt;form-saver storage-key="demo:esm"&gt;</mark>
   &lt;form action="/demo-contact" method="post"&gt;
-    &lt;label&gt;Name &lt;input name="name"&gt;&lt;/label&gt;
-    &lt;label&gt;Email &lt;input name="email" type="email"&gt;&lt;/label&gt;
+    &lt;label&gt;Name &lt;input name="name" autocomplete="name" /&gt;&lt;/label&gt;
+    &lt;label&gt;Email &lt;input name="email" type="email" autocomplete="email" /&gt;&lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 					</micro-lighter>
 					<div class="demo" data-demo-label="Live example">
@@ -96,7 +111,7 @@
 							<p
 								class="draft-feedback"
 								role="status"
-								data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 							></p>
 						</form-saver>
 					</div>

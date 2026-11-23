@@ -43,7 +43,7 @@
 				hidden
 			></p>
 
-			<section class="demo-section">
+			<section class="demo-section" id="writing-help">
 				<h2>Connect behavior without storage hooks</h2>
 				<p>
 					The <code>script</code> attribute loads an application
@@ -63,13 +63,33 @@
 				</p>
 				<p>
 					Use invented details. Drafts are still saved as plaintext in
-					this browser’s localStorage; this module does not encrypt
-					them. Without JavaScript, the writing tips stay visible and
-					the native form remains usable, but drafts aren’t saved. If
-					the behavior module fails, the tips remain available and
+					this browser’s <code>localStorage</code>; scripts on this
+					origin can read them. Password and file controls are
+					excluded. This module does not encrypt them.
+				</p>
+				<p>
+					Without JavaScript, the writing tips stay visible and the
+					native form remains usable, but drafts aren’t saved. If the
+					behavior module fails, the tips remain available and
 					persistence is blocked. Keep a copy before leaving. The
 					<code>/contact</code> endpoint is a placeholder, not a
 					submission service.
+				</p>
+				<p>
+					Save
+					<a href="./writing-help.js">the complete module</a> beside
+					your page and register <code>&lt;form-saver&gt;</code> with
+					<code>define.js</code>. Initialization finishes before
+					drafts are restored or saved. Don’t await
+					<code>saveFormState()</code> or
+					<code>restoreFormState()</code> inside
+					<code>initialize()</code>—those methods wait for it,
+					creating a circular wait. See the
+					<a
+						href="https://github.com/aarongustafson/form-saver/blob/main/README.md#behavior-modules"
+						>module lifecycle reference</a
+					>
+					for replacement and cleanup behavior.
 				</p>
 				<div class="code-demo-pair">
 					<micro-lighter
@@ -101,15 +121,9 @@
     &lt;/p&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
-<mark>&lt;/form-saver&gt;</mark>
-
-// writing-help.js (excerpt)
-<mark>export function initialize(saver, { signal }) {</mark>
-  const button = saver.querySelector('[data-toggle-help]');
-  // The full module also sets labels and restores the
-  // authored presentation in its cleanup function.
-  button.addEventListener('click', toggleHelp, { signal });
-<mark>}</mark></code></pre>
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage or the behavior module is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
+<mark>&lt;/form-saver&gt;</mark></code></pre>
 					</micro-lighter>
 					<div class="demo" data-demo-label="Live example">
 						<form-saver
@@ -143,7 +157,7 @@
 							<p
 								class="draft-feedback"
 								role="status"
-								data-error="Draft storage or the behavior module is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+								data-error="Draft storage or the behavior module is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 							></p>
 						</form-saver>
 					</div>

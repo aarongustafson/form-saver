@@ -13,8 +13,9 @@
 			<p class="eyebrow">Web component / Examples</p>
 			<h1>&lt;form-saver&gt;</h1>
 			<p class="lede">
-				A web component that stores (and restores) values within the
-				form it wraps. See the
+				Save drafts from a native form and restore them on a later
+				visit. Without JavaScript, the form remains usable, but drafts
+				aren’t saved. See the
 				<a
 					href="https://github.com/aarongustafson/form-saver/blob/main/README.md"
 					>README</a
@@ -54,30 +55,36 @@
 			</p>
 			<p>
 				Use invented details: drafts are stored in this browser’s
-				localStorage, including message text. Passwords and files are
+				<code>localStorage</code>, including message text. Any script
+				running on this origin can read them. Passwords and files are
 				excluded. The retention checkbox controls what remains after
 				submission, not whether drafts are saved.
 			</p>
 			<p>
-				Without JavaScript, or if the module fails to load, the forms
-				and their native validation still work, but drafts aren’t saved.
-				Keep a copy before leaving. These examples use a placeholder
+				Each example uses its own <code>storage-key</code> so drafts
+				don’t overwrite one another. Load the
+				<a href="./feedback.js">feedback module</a> before registering
+				the component with <code>define.js</code> to show the authored
+				<code>data-error</code>
+				message when storage fails. This is demo UI, not a component
+				attribute or a saved/restored notification.
+			</p>
+			<p>
+				If JavaScript is unavailable, or if the module fails to load,
+				the forms and their native validation still work, but drafts
+				aren’t saved. Keep a copy before leaving. These examples use a
+				placeholder
 				<code>/contact</code> endpoint; no working submission service is
 				provided.
 			</p>
 			<!-- Basic Example -->
-			<section>
-				<h2>Basic Example</h2>
-				<p>
-					Saves and restores field values for the first form inside
-					<code>&lt;form-saver&gt;</code>.
-				</p>
-
-				<div class="demo-section">
-					<h3>Basic Usage</h3>
+			<section id="basic-example">
+				<div class="demo-section" id="basic-usage">
+					<h2>Save and restore a draft</h2>
 					<p>
-						Type into this form and refresh the page to see values
-						restored.
+						Wrap the first form in <code>&lt;form-saver&gt;</code>.
+						Type into it, pause briefly for autosave, and refresh
+						the page to see values restored.
 					</p>
 					<div class="code-demo-pair">
 						<micro-lighter
@@ -89,7 +96,7 @@
 							<pre
 								aria-label="Basic Usage code 1"
 								tabindex="0"
-							><code><mark>&lt;form-saver&gt;</mark>
+							><code><mark>&lt;form-saver storage-key="demo:basic"&gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
       Name
@@ -105,6 +112,8 @@
     &lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 						</micro-lighter>
 						<div class="demo" data-demo-label="Live example">
@@ -134,7 +143,7 @@
 								<p
 									class="draft-feedback"
 									role="status"
-									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 								></p>
 							</form-saver>
 						</div>
@@ -143,24 +152,40 @@
 			</section>
 
 			<!-- Retain Specific Fields -->
-			<section>
+			<section id="retaining-fields">
 				<h2>Retaining specific fields</h2>
 				<p>
 					The <code>retain</code> attribute takes a space-separated
 					list of field names (or IDs as a fallback) that should
-					survive a <em>successful</em> form submission — everything
-					else is wiped. This is useful for contact forms where you
-					want to pre-populate the sender's name and email address on
-					their next visit, but not their message.
+					remain in storage during post-submit cleanup. This is useful
+					for contact forms where you want to pre-populate the
+					sender’s name and email address on their next visit, but not
+					their message.
+				</p>
+				<p>
+					The component clears the full draft on <code>pagehide</code>
+					following a submit it observed as uncanceled. It doesn’t
+					check the response, confirm server acceptance, or reset the
+					current form. A server rejection can still be followed by
+					cleanup. For application-controlled submission, cancel the
+					event before the component’s listener runs, then call
+					<code>clearSavedData()</code> after your application
+					confirms acceptance. See the
+					<a
+						href="https://github.com/aarongustafson/form-saver/blob/main/README.md#autosave-submission-and-retention"
+						>submission reference</a
+					>.
 				</p>
 
-				<div class="demo-section">
+				<div class="demo-section" id="retain-selected-fields">
 					<h3>Using the <code>retain</code> attribute</h3>
 					<p>
-						After you submit this form, reload the page. The
+						After a submit followed by leaving this page, return to
+						this example. The
 						<strong>Name</strong> and <strong>Email</strong> fields
-						will be restored; <strong>Message</strong> will be
-						blank.
+						can be restored; <strong>Message</strong> is not
+						retained. The placeholder endpoint cannot confirm
+						delivery.
 					</p>
 					<div class="code-demo-pair">
 						<micro-lighter
@@ -172,7 +197,9 @@
 							<pre
 								aria-label="Using the retain attribute code 2"
 								tabindex="0"
-							><code><mark>&lt;form-saver retain="name email"&gt;</mark>
+							><code><mark>&lt;form-saver
+  retain="name email"
+  storage-key="demo:retain-fields"&gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
       Name
@@ -188,6 +215,8 @@
     &lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 						</micro-lighter>
 						<div class="demo" data-demo-label="Live example">
@@ -220,7 +249,7 @@
 								<p
 									class="draft-feedback"
 									role="status"
-									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 								></p>
 							</form-saver>
 						</div>
@@ -229,27 +258,28 @@
 			</section>
 
 			<!-- User-controlled retention -->
-			<section>
-				<h2>Letting users control long-term retention</h2>
+			<section id="retention-choices">
+				<h2>Let people choose post-submit retention</h2>
 				<p>
-					Sometimes you should let the <em>user</em> decide whether
-					their details are kept. The <code>retain-choice</code>
-					attribute injects an accessible opt-in checkbox into the
-					form. If the user leaves it unchecked (the default), the
-					retained fields are cleared on submit just like everything
-					else. You can further customise the experience with
+					The <code>retain-choice</code>
+					attribute inserts a labeled opt-in checkbox into the form.
+					If the user leaves it unchecked (the default), the selected
+					fields are removed from storage during post-submit cleanup
+					too. Autosave still runs while typing: this checkbox is not
+					consent to draft storage. Obtain any required consent before
+					enabling the component. You can customize the checkbox with
 					<code>retain-choice-label</code> and
 					<code>retain-choice-container</code>.
 				</p>
 
-				<div class="demo-section">
+				<div class="demo-section" id="retention-opt-in">
 					<h3>Simple opt-in: <code>retain-choice</code></h3>
 					<p>
 						Add <code>retain-choice</code> alongside
 						<code>retain</code> and <code>&lt;form-saver&gt;</code>
 						will automatically inject a labelled checkbox directly
-						before the submit button. The default label is
-						<em>"Store my contact information for later"</em>.
+						before the submit button. The default label is “Store my
+						contact information for later”.
 					</p>
 					<div class="code-demo-pair">
 						<micro-lighter
@@ -264,6 +294,7 @@
 							><code><mark>&lt;form-saver
   retain="name email"
   retain-choice
+  storage-key="demo:retain-choice-basic"
 &gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
@@ -280,6 +311,8 @@
     &lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 						</micro-lighter>
 						<div class="demo" data-demo-label="Live example">
@@ -313,22 +346,22 @@
 								<p
 									class="draft-feedback"
 									role="status"
-									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 								></p>
 							</form-saver>
 						</div>
 					</div>
 				</div>
 
-				<div class="demo-section">
+				<div class="demo-section" id="retention-label">
 					<h3>
 						Custom label:
 						<code>retain-choice-label</code>
 					</h3>
 					<p>
 						Use <code>retain-choice-label</code> to provide label
-						text that better fits your form's context or brand
-						voice.
+						text that fits your application’s vocabulary, or to
+						translate the generated checkbox.
 					</p>
 					<div class="code-demo-pair">
 						<micro-lighter
@@ -344,11 +377,16 @@
   retain="name email"
   retain-choice
   retain-choice-label="Remember my details next time"
+  storage-key="demo:retain-choice-label"
 &gt;</mark>
   &lt;form action="/contact" method="post"&gt;
-    ...
+    &lt;label&gt;Name &lt;input name="name" autocomplete="name" /&gt;&lt;/label&gt;
+    &lt;label&gt;Email &lt;input name="email" type="email" autocomplete="email" /&gt;&lt;/label&gt;
+    &lt;label&gt;Message &lt;textarea name="message"&gt;&lt;/textarea&gt;&lt;/label&gt;
     &lt;button type="submit"&gt;Send&lt;/button&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 						</micro-lighter>
 						<div class="demo" data-demo-label="Live example">
@@ -383,14 +421,89 @@
 								<p
 									class="draft-feedback"
 									role="status"
-									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 								></p>
 							</form-saver>
 						</div>
 					</div>
 				</div>
 
-				<div class="demo-section">
+				<div class="demo-section" id="translated-retention">
+					<h3>Translate the checkbox and recovery message</h3>
+					<p>
+						Set <code>retain-choice-label</code> for the generated
+						checkbox. Translate your own field labels, buttons, and
+						<code>data-error</code> feedback separately. This French
+						example sets <code>lang="fr"</code> on its live form.
+						The checkbox still controls only post-submit retention.
+					</p>
+					<div class="code-demo-pair">
+						<micro-lighter
+							class="code-panel"
+							language="html"
+							controls="copy"
+							data-label="HTML"
+						>
+							<pre
+								aria-label="Translated retention code"
+								tabindex="0"
+							><code><mark>&lt;form-saver
+  lang="fr"
+  retain="name email"
+  retain-choice
+  retain-choice-label="Conserver mes coordonnées pour la prochaine fois"
+  storage-key="demo:retain-choice-fr"&gt;</mark>
+  &lt;form action="/contact" method="post"&gt;
+    &lt;label&gt;Nom &lt;input name="name" autocomplete="name" /&gt;&lt;/label&gt;
+    &lt;label&gt;Adresse e-mail &lt;input name="email" type="email" autocomplete="email" /&gt;&lt;/label&gt;
+    &lt;label&gt;Message &lt;textarea name="message"&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;button type="submit"&gt;Envoyer&lt;/button&gt;
+  &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Le stockage du brouillon est indisponible. Vos réponses restent dans le formulaire. Gardez une copie avant de quitter cette page."&gt;&lt;/p&gt;
+<mark>&lt;/form-saver&gt;</mark></code></pre>
+						</micro-lighter>
+						<div
+							class="demo"
+							data-demo-label="Exemple interactif"
+							lang="fr"
+						>
+							<form-saver
+								lang="fr"
+								retain="name email"
+								retain-choice
+								retain-choice-label="Conserver mes coordonnées pour la prochaine fois"
+								storage-key="demo:retain-choice-fr"
+							>
+								<form action="/contact" method="post">
+									<label
+										>Nom
+										<input name="name" autocomplete="name"
+									/></label>
+									<label
+										>Adresse e-mail
+										<input
+											name="email"
+											type="email"
+											autocomplete="email"
+									/></label>
+									<label
+										>Message
+										<textarea name="message"></textarea>
+									</label>
+									<button type="submit">Envoyer</button>
+								</form>
+								<p
+									class="draft-feedback"
+									role="status"
+									data-error="Le stockage du brouillon est indisponible. Vos réponses restent dans le formulaire. Gardez une copie avant de quitter cette page."
+								></p>
+							</form-saver>
+						</div>
+					</div>
+				</div>
+
+				<div class="demo-section" id="retention-placement">
 					<h3>
 						Custom placement:
 						<code>retain-choice-container</code>
@@ -420,6 +533,7 @@
   retain-choice
   retain-choice-label="Remember my details next time"
   retain-choice-container=".form-footer"
+  storage-key="demo:retain-choice-container"
 &gt;</mark>
   &lt;form action="/contact" method="post"&gt;
     &lt;label&gt;
@@ -438,6 +552,8 @@
       &lt;button type="submit"&gt;Send&lt;/button&gt;
     &lt;/div&gt;
   &lt;/form&gt;
+  &lt;p class="draft-feedback" role="status"
+    data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."&gt;&lt;/p&gt;
 <mark>&lt;/form-saver&gt;</mark></code></pre>
 						</micro-lighter>
 						<div class="demo" data-demo-label="Live example">
@@ -475,7 +591,7 @@
 								<p
 									class="draft-feedback"
 									role="status"
-									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving, or submit the form."
+									data-error="Draft storage is unavailable. Your entered values remain in the form. Keep a copy before leaving."
 								></p>
 							</form-saver>
 						</div>
